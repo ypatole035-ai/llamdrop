@@ -347,31 +347,43 @@ def _build_prompt(history, system_prompt=None):
 # ── llama-cli launcher ────────────────────────────────────────────────────────
 
 def _launch_llama(cmd, prompt):
-    """Hand terminal directly to llama-cli for a single-shot inference."""
+    """
+    Hand terminal directly to llama-cli for a single-shot inference.
+    Uses --single-turn so llama-cli exits after one response and returns
+    control back to our chat loop.
+    """
+    # Strip any old interactive/log flags that may be in cmd from launcher
+    strip_flags = {
+        "-i", "--interactive", "--interactive-first",
+        "--no-interactive", "--color", "--log-disable",
+    }
+    strip_with_value = {"-n", "--predict", "--n-predict"}
+
     clean_cmd = []
     i = 0
     while i < len(cmd):
         arg = cmd[i]
-        if arg in ("-i", "--interactive", "--interactive-first",
-                   "--no-display-prompt", "--no-interactive", "--color"):
+        if arg in strip_flags:
             i += 1
             continue
-        if arg == "-n" and i + 1 < len(cmd):
+        if arg in strip_with_value and i + 1 < len(cmd):
             i += 2
             continue
         clean_cmd.append(arg)
         i += 1
 
     clean_cmd += [
-        "-p", prompt,
-        "-n", "200",
-        "--temp", "0.7",
-        "--log-disable",
-        "-c", "1024",
+        "-p",               prompt,
+        "--predict",        "300",       # max tokens to generate
+        "--single-turn",                 # exit after one response, no interactive loop
+        "--no-display-prompt",           # don't echo the prompt back
+        "--simple-io",                   # better subprocess compatibility
+        "--temp",           "0.7",
     ]
 
     try:
         subprocess.run(clean_cmd, env=_get_env())
+        print("")  # newline after model output
     except KeyboardInterrupt:
         print("\n  (interrupted)")
     except Exception as e:
