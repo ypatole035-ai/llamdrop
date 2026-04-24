@@ -11,7 +11,7 @@ import curses
 import json
 import time
 
-VERSION = "0.3.0"
+VERSION = "0.4.0"
 
 # Ensure modules directory is on path
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -19,13 +19,16 @@ sys.path.insert(0, os.path.join(SCRIPT_DIR, "modules"))
 
 from device      import get_device_profile, format_profile_summary
 from browser     import show_browser
-from downloader  import download_model, get_downloaded_models, model_is_downloaded
-from launcher    import find_llama_binary, llama_is_installed, launch_model, get_launch_summary
+from downloader  import (download_model, get_downloaded_models,
+                          get_all_gguf_files, model_is_downloaded,
+                          smart_pick_variant)
+from launcher    import (find_llama_binary, llama_is_installed,
+                          launch_model, get_launch_summary, detect_vulkan)
 from chat        import run_chat, list_sessions, load_session
 from hf_search   import search_hf_models
 from ram_monitor import ram_one_line, print_ram_dashboard, read_ram_full
-from updater     import run_background_update, get_pending_version_notice, check_catalog_update
-from i18n        import load_language, t, get_available_langs, save_language, choose_language_menu
+from updater     import run_background_update, get_pending_version_notice
+from i18n        import load_language, t, save_language, choose_language_menu
 
 
 # ── ANSI colors ───────────────────────────────────────────────────────────────
@@ -53,7 +56,7 @@ def print_banner():
   ███████╗███████╗██║  ██║██║ ╚═╝ ██║██████╔╝██║  ██║╚██████╔╝██║
   ╚══════╝╚══════╝╚═╝  ╚═╝╚═╝     ╚═╝╚═════╝ ╚═╝  ╚═╝ ╚═════╝ ╚═╝
     """))
-    print(c(CYAN, f"  {t('tagline')}"))
+    print(c(CYAN,   f"  {t('tagline')}"))
     print(c(YELLOW, f"  v{VERSION} · {t('free_forever')} · github.com/ypatole035-ai/llamdrop"))
     print("")
     print("  " + "━" * 54)
@@ -63,22 +66,20 @@ def print_banner():
 # ── Curses main menu ──────────────────────────────────────────────────────────
 
 def get_menu_items():
-    """Build menu items using current language strings."""
     return [
-        ("🚀", t("menu_chat"),      t("desc_chat")),
-        ("⬇️ ", t("menu_browse"),   t("desc_browse")),
-        ("🔎", t("menu_search"),    t("desc_search")),
-        ("📂", t("menu_mymodels"),  t("desc_mymodels")),
-        ("💾", t("menu_resume"),    t("desc_resume")),
-        ("🔧", t("menu_device"),    t("desc_device")),
-        ("🌐", "Language / भाषा",   "Change display language"),
-        ("❓", t("menu_help"),      t("desc_help")),
-        ("✕",  t("menu_quit"),      ""),
+        ("🚀", t("menu_chat"),     t("desc_chat")),
+        ("⬇️ ", t("menu_browse"),  t("desc_browse")),
+        ("🔎", t("menu_search"),   t("desc_search")),
+        ("📂", t("menu_mymodels"), t("desc_mymodels")),
+        ("💾", t("menu_resume"),   t("desc_resume")),
+        ("🔧", t("menu_device"),   t("desc_device")),
+        ("🌐", "Language / भाषा",  "Change display language"),
+        ("❓", t("menu_help"),     t("desc_help")),
+        ("✕",  t("menu_quit"),     ""),
     ]
 
 
-def run_main_menu(stdscr, device_profile, notice=None):
-    """Arrow-key main menu. Returns index of selected option."""
+def run_main_menu(stdscr, device_profile, notice=None, vulkan_info=None):
     curses.curs_set(0)
     stdscr.keypad(True)
     curses.start_color()
@@ -96,36 +97,44 @@ def run_main_menu(stdscr, device_profile, notice=None):
         stdscr.clear()
         height, width = stdscr.getmaxyx()
 
-        # Header row
+        # Header
         title = " 🦙 llamdrop "
         stdscr.attron(curses.color_pair(1) | curses.A_BOLD)
         stdscr.addstr(0, 0, title.ljust(width)[:width])
         stdscr.attroff(curses.color_pair(1) | curses.A_BOLD)
 
-        # Device specs
+        # Device summary
         summary = " " + format_profile_summary(device_profile)
         stdscr.attron(curses.color_pair(2))
         stdscr.addstr(1, 0, summary[:width])
         stdscr.attroff(curses.color_pair(2))
 
-        # RAM live line
-        ram_info  = read_ram_full()
-        avail_gb  = ram_info["avail_gb"]
-        total_gb  = ram_info["total_gb"]
-        ram_pct   = int((total_gb - avail_gb) / total_gb * 100) if total_gb > 0 else 0
-        bar_w     = 15
-        filled    = int(bar_w * ram_pct / 100)
-        ram_bar   = "█" * filled + "░" * (bar_w - filled)
-        ram_color = 5 if avail_gb < 0.8 else (4 if avail_gb < 1.5 else 3)
-        ram_line  = f" RAM [{ram_bar}] {avail_gb}GB free"
-        stdscr.attron(curses.color_pair(ram_color))
+        # Live RAM bar
+        ram_info = read_ram_full()
+        avail_gb = ram_info["avail_gb"]
+        total_gb = ram_info["total_gb"]
+        ram_pct  = int((total_gb - avail_gb) / total_gb * 100) if total_gb > 0 else 0
+        bar_w    = 15
+        filled   = int(bar_w * ram_pct / 100)
+        ram_bar  = "█" * filled + "░" * (bar_w - filled)
+        ram_col  = 5 if avail_gb < 0.8 else (4 if avail_gb < 1.5 else 3)
+        ram_line = f" RAM [{ram_bar}] {avail_gb}GB free"
+        stdscr.attron(curses.color_pair(ram_col))
         stdscr.addstr(2, 0, ram_line[:width])
-        stdscr.attroff(curses.color_pair(ram_color))
+        stdscr.attroff(curses.color_pair(ram_col))
 
-        # llama.cpp status
-        llama_ok  = llama_is_installed()
-        status    = "  llama.cpp: ✓ ready" if llama_ok else "  llama.cpp: ✗ not installed"
-        color     = 3 if llama_ok else 4
+        # llama.cpp + Vulkan status
+        llama_ok = llama_is_installed()
+        if llama_ok:
+            if vulkan_info and vulkan_info.get("available"):
+                status = f"  llama.cpp: ✓ ready · GPU: {vulkan_info['gpu_type']}"
+                color  = 3
+            else:
+                status = "  llama.cpp: ✓ ready · GPU: CPU only"
+                color  = 3
+        else:
+            status = "  llama.cpp: ✗ not installed"
+            color  = 4
         stdscr.attron(curses.color_pair(color))
         stdscr.addstr(3, 0, status[:width])
         stdscr.attroff(curses.color_pair(color))
@@ -185,13 +194,12 @@ def run_main_menu(stdscr, device_profile, notice=None):
         elif key in (curses.KEY_ENTER, ord('\n'), ord('\r')):
             return selected
         elif key in (ord('q'), ord('Q'), 27):
-            return len(menu_items) - 1  # Quit
+            return len(menu_items) - 1
 
 
-# ── HuggingFace Search screen ─────────────────────────────────────────────────
+# ── HuggingFace search screen ─────────────────────────────────────────────────
 
 def show_hf_search(device_profile):
-    """Live HuggingFace search screen."""
     os.system("clear")
     print_banner()
     print(c(BOLD, f"  {t('menu_search')}\n"))
@@ -216,16 +224,14 @@ def show_hf_search(device_profile):
     print(f"\n  Found {len(results)} compatible models. Opening browser...\n")
     time.sleep(1)
 
-    # Reuse the curses browser with the live search results
-    import curses as _curses
     from browser import run_browser
-    selected = _curses.wrapper(run_browser, results, device_profile)
+    selected = curses.wrapper(run_browser, results, device_profile)
     return selected
 
 
 # ── Device info screen ────────────────────────────────────────────────────────
 
-def show_device_info(device_profile):
+def show_device_info(device_profile, vulkan_info=None):
     os.system("clear")
     print_banner()
     ram  = device_profile["ram"]
@@ -240,6 +246,19 @@ def show_device_info(device_profile):
     print(f"  RAM total : {ram.get('total_gb', '?')} GB")
     print(f"  RAM free  : {ram.get('available_gb', '?')} GB")
     print(f"  Storage   : {stor.get('free_gb', '?')} GB free / {stor.get('total_gb', '?')} GB")
+
+    # Vulkan info
+    print("")
+    print(c(BOLD, "  GPU / Acceleration:"))
+    if vulkan_info:
+        if vulkan_info.get("available"):
+            print(c(GREEN, f"  Vulkan    : ✓ {vulkan_info['gpu_type']}"))
+            print(f"  Note      : {vulkan_info.get('note', '')}")
+        else:
+            print(c(YELLOW, f"  Vulkan    : ✗ Not available ({vulkan_info.get('note', 'CPU only')})"))
+    else:
+        print("  Vulkan    : (not checked)")
+
     print("")
     print(c(BOLD, "  llamdrop settings:"))
     print(f"  Threads   : {device_profile['optimal_threads']}")
@@ -257,14 +276,30 @@ def show_device_info(device_profile):
     input(f"  {t('press_enter_back')}")
 
 
-# ── Downloaded models screen ──────────────────────────────────────────────────
+# ── My downloaded models screen ───────────────────────────────────────────────
 
 def show_downloaded_models(device_profile):
+    """
+    v0.4: Shows both ~/.llamdrop/models/ files AND any GGUFs found
+    elsewhere on the phone (Downloads, Documents, etc.)
+    """
     os.system("clear")
     print_banner()
-    models = get_downloaded_models()
 
-    if not models:
+    # Get llamdrop-managed models
+    managed = get_downloaded_models()
+
+    # Scan phone for other GGUFs
+    print(f"  Scanning for GGUF files on your device...", end="", flush=True)
+    all_files = get_all_gguf_files()
+    # all_files already includes managed ones — deduplicate by path
+    managed_paths = {m["path"] for m in managed}
+    external = [f for f in all_files if f["path"] not in managed_paths]
+    print(" done\n")
+
+    combined = managed + external
+
+    if not combined:
         print(f"  {t('no_models')}")
         print(f"  {t('go_to_browse')}")
         print("")
@@ -272,8 +307,17 @@ def show_downloaded_models(device_profile):
         return None
 
     print(c(BOLD, f"  {t('menu_mymodels')}:\n"))
-    for i, m in enumerate(models):
-        print(f"  [{i+1}] {m['filename']}  ({m['size_gb']}GB)")
+
+    if managed:
+        print(c(CYAN, "  ── llamdrop managed ─────────────────────────────────"))
+        for i, m in enumerate(managed):
+            print(f"  [{i+1}] {m['filename']}  ({m['size_gb']}GB)")
+
+    if external:
+        offset = len(managed)
+        print(c(CYAN, "\n  ── found on phone ───────────────────────────────────"))
+        for i, m in enumerate(external):
+            print(f"  [{offset + i + 1}] {m['filename']}  ({m['size_gb']}GB)  📁 {m['path']}")
 
     print("")
     print("  Enter number to chat, or 0 to go back: ", end="")
@@ -282,9 +326,9 @@ def show_downloaded_models(device_profile):
     except (ValueError, EOFError):
         return None
 
-    if choice == 0 or choice > len(models):
+    if choice == 0 or choice > len(combined):
         return None
-    return models[choice - 1]
+    return combined[choice - 1]
 
 
 # ── Resume session screen ─────────────────────────────────────────────────────
@@ -339,6 +383,7 @@ def show_help():
     print(f"  {t('cmd_save')}")
     print(f"  {t('cmd_clear')}")
     print(f"  {t('cmd_ram')}")
+    print("  /trim   — manually trim old context to free RAM")
     print(f"  {t('cmd_quit')}")
     print("")
     print(c(BOLD, "  Tips:\n"))
@@ -346,6 +391,7 @@ def show_help():
     print("  • If the model crashes, try a smaller model or Tier 1")
     print("  • llamdrop auto-saves every 5 exchanges")
     print("  • Context is trimmed automatically when RAM gets low")
+    print("  • Use 'My downloaded models' to find GGUFs already on your phone")
     print("")
     input(f"  {t('press_enter_back')}")
 
@@ -353,26 +399,33 @@ def show_help():
 # ── Main loop ─────────────────────────────────────────────────────────────────
 
 def main():
-    # Load language preference
     load_language()
 
     print(f"  {t('loading')}")
     device_profile = get_device_profile()
+
+    # Detect Vulkan once at startup
+    print("  Checking GPU acceleration...", end="", flush=True)
+    vulkan_info = detect_vulkan()
+    if vulkan_info.get("available"):
+        print(c(GREEN, f" ✓ {vulkan_info['gpu_type']}"))
+    else:
+        print(" CPU only")
 
     # Find models.json
     models_json = os.path.join(SCRIPT_DIR, "models.json")
     if not os.path.exists(models_json):
         models_json = os.path.expanduser("~/.llamdrop/models.json")
 
-    # Start background updater
-    update_thread = run_background_update(VERSION)
-
-    # Check for version notice from previous update check
+    # Background updater
+    run_background_update(VERSION)
     version_notice = get_pending_version_notice()
 
     while True:
-        choice = curses.wrapper(run_main_menu, device_profile, version_notice)
-        version_notice = None  # show notice only once per session
+        choice = curses.wrapper(
+            run_main_menu, device_profile, version_notice, vulkan_info
+        )
+        version_notice = None
 
         # 0 — Start chatting
         if choice == 0:
@@ -380,13 +433,20 @@ def main():
             if model_info:
                 os.system("clear")
                 print_banner()
-                cmd, _, status = launch_model(model_info["path"], device_profile)
+                cmd, v_info, status = launch_model(
+                    model_info["path"], device_profile
+                )
                 if cmd is None:
                     print(c(RED, f"\n  Error: {status}"))
                     input(f"\n  {t('press_enter_back')}")
                     continue
+                # Determine variant key for summary
+                v_key = model_info.get("_best_variant_key", "downloaded")
                 print(c(BOLD, "  Launch settings:\n"))
-                print(get_launch_summary(device_profile, model_info["filename"], "downloaded"))
+                print(get_launch_summary(
+                    device_profile, model_info["filename"], v_key,
+                    v_info, 0
+                ))
                 input(f"\n  Press Enter to start chatting...")
                 run_chat(cmd, model_info["filename"], device_profile)
 
@@ -396,8 +456,9 @@ def main():
             if selected_model and status == "ok":
                 os.system("clear")
                 print_banner()
-                variant  = selected_model.get("_best_variant", {})
-                filename = variant.get("filename", "")
+                # smart_pick_variant re-checks live RAM right now
+                v_key, variant = smart_pick_variant(selected_model)
+                filename = variant.get("filename", "") if variant else ""
                 if filename and model_is_downloaded(filename):
                     print(c(GREEN, f"  ✓ {t('already_dl')}"))
                     input(f"\n  {t('press_enter_back')}")
@@ -416,8 +477,8 @@ def main():
                 os.system("clear")
                 print_banner()
                 print(c(YELLOW, f"  {t('unverified_warn')}\n"))
-                variant  = selected_model.get("_best_variant", {})
-                filename = variant.get("filename", "")
+                v_key, variant = smart_pick_variant(selected_model)
+                filename = variant.get("filename", "") if variant else ""
                 if filename and model_is_downloaded(filename):
                     print(c(GREEN, f"  ✓ {t('already_dl')}"))
                     input(f"\n  {t('press_enter_back')}")
@@ -429,22 +490,41 @@ def main():
                     print(c(RED, f"\n  {t('dl_failed')}: {msg}"))
                 input(f"\n  {t('press_enter_back')}")
 
-        # 3 — My downloaded models
+        # 3 — My downloaded models (just show, no chat launch — user browses)
         elif choice == 3:
-            show_downloaded_models(device_profile)
+            model_info = show_downloaded_models(device_profile)
+            if model_info:
+                os.system("clear")
+                print_banner()
+                cmd, v_info, status = launch_model(
+                    model_info["path"], device_profile
+                )
+                if cmd is None:
+                    print(c(RED, f"\n  Error: {status}"))
+                    input(f"\n  {t('press_enter_back')}")
+                    continue
+                print(c(BOLD, "  Launch settings:\n"))
+                print(get_launch_summary(
+                    device_profile, model_info["filename"],
+                    model_info.get("_best_variant_key", "local"),
+                    v_info, 0
+                ))
+                input(f"\n  Press Enter to start chatting...")
+                run_chat(cmd, model_info["filename"], device_profile)
 
         # 4 — Resume session
         elif choice == 4:
             model_name, history = show_sessions()
             if model_name and history:
-                downloaded = get_downloaded_models()
+                # Search both managed + phone-scanned files
+                all_files  = get_all_gguf_files()
                 model_path = None
-                for m in downloaded:
+                for m in all_files:
                     if model_name.lower() in m["filename"].lower():
                         model_path = m["path"]
                         break
                 if model_path:
-                    cmd, _, status = launch_model(model_path, device_profile)
+                    cmd, v_info, status = launch_model(model_path, device_profile)
                     if cmd:
                         run_chat(cmd, model_name, device_profile,
                                  initial_history=history)
@@ -453,18 +533,19 @@ def main():
                         input(f"\n  {t('press_enter_back')}")
                 else:
                     print(c(YELLOW, f"\n  Model file for '{model_name}' not found."))
+                    print("  Go to 'Browse & download' to re-download it.")
                     input(f"\n  {t('press_enter_back')}")
 
         # 5 — Device info
         elif choice == 5:
-            show_device_info(device_profile)
+            show_device_info(device_profile, vulkan_info)
 
-        # 6 — Language chooser
+        # 6 — Language
         elif choice == 6:
             os.system("clear")
             print_banner()
             choose_language_menu()
-            load_language()  # reload after change
+            load_language()
 
         # 7 — Help
         elif choice == 7:
@@ -474,7 +555,7 @@ def main():
         elif choice == 8:
             os.system("clear")
             print(c(BLUE + BOLD, "\n  🦙 llamdrop"))
-            print(c(CYAN, f"  {t('goodbye')}"))
+            print(c(CYAN,   f"  {t('goodbye')}"))
             print(c(YELLOW, "  Star the repo: github.com/ypatole035-ai/llamdrop"))
             print("")
             sys.exit(0)
