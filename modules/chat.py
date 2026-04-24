@@ -298,10 +298,13 @@ def run_chat(cmd, model_name, device_profile,
             indicator.start()
             watcher.start()
 
+            # Stop spinner before model output begins to avoid mixing
+            indicator.stop()
+            print("  🦙 ", end="", flush=True)
+
             _launch_llama(cmd, prompt)
 
             watcher.stop()
-            indicator.stop()
 
             # ── Post-inference RAM check ──────────────────────────────────────
             if watcher.hit_critical:
@@ -338,8 +341,10 @@ def _build_prompt(history, system_prompt=None):
     for turn in history:
         role    = turn.get("role", "user")
         content = turn.get("content", "")
-        if content != "[response above]":
-            parts.append(f"<|im_start|>{role}\n{content}<|im_end|>")
+        # Replace placeholder with generic text so context is preserved
+        if content == "[response above]":
+            content = "I responded above."
+        parts.append(f"<|im_start|>{role}\n{content}<|im_end|>")
     parts.append("<|im_start|>assistant")
     return "\n".join(parts)
 
@@ -496,4 +501,4 @@ def _handle_exit(history, model_name, session_name):
     except Exception:
         pass
     print("  Goodbye! 🦙")
-                
+        
