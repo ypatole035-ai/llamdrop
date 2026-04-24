@@ -431,21 +431,36 @@ def _launch_llama(cmd, prompt):
         t = threading.Thread(target=_drain_stderr, daemon=True)
         t.start()
 
-        skip_until_assistant_done = True
-        for line in proc.stdout:
-            s = line.rstrip()
-            # Skip the prompt echo block entirely
-            if skip_until_assistant_done:
-                if s == "<|im_start|>assistant" or s.endswith(">assistant"):
-                    skip_until_assistant_done = False
-                continue
-            # Skip known noise lines
-            if any(s.startswith(p) for p in _SKIP):
-                continue
-            if s:
-                print(f"  {s}")
-
+        # Collect all output, then find and print only the response part
+        raw_output = proc.stdout.read()
         proc.wait()
+
+        # The model echoes the full prompt then generates the response.
+        # The response starts after the LAST "<|im_start|>assistant" marker.
+        marker = "<|im_start|>assistant"
+        if marker in raw_output:
+            response_text = raw_output.split(marker)[-1]
+        else:
+            response_text = raw_output
+
+        # Clean up the response
+        _NOISE = (
+            "llama_memory", "load_backend", "Exiting",
+            "llama_", "ggml_", "build :", "model :",
+            "modalities :", "available commands", "/exit", "/regen",
+            "/clear", "/read", "/glob", "[ Prompt:",
+        )
+        for line in response_text.splitlines():
+            s = line.rstrip()
+            if not s:
+                continue
+            # Skip any leaked prompt tokens or noise
+            if "<|im_start|>" in s or "<|im_end|>" in s:
+                continue
+            if any(s.startswith(p) for p in _NOISE):
+                continue
+            print(f"  {s}")
+
         t.join(timeout=2)
         print("")
     except KeyboardInterrupt:
@@ -501,4 +516,4 @@ def _handle_exit(history, model_name, session_name):
     except Exception:
         pass
     print("  Goodbye! 🦙")
-        
+    
