@@ -334,33 +334,73 @@ def show_downloaded_models(device_profile):
 # ── Resume session screen ─────────────────────────────────────────────────────
 
 def show_sessions():
-    os.system("clear")
-    print_banner()
-    sessions = list_sessions()
+    while True:
+        os.system("clear")
+        print_banner()
+        sessions = list_sessions()
 
-    if not sessions:
-        print(f"  {t('no_sessions')}")
+        if not sessions:
+            print(f"  {t('no_sessions')}")
+            print("")
+            input(f"  {t('press_enter_back')}")
+            return None, None
+
+        print(c(BOLD, f"  {t('menu_resume')}:\n"))
+        for i, s in enumerate(sessions):
+            print(f"  [{i+1}] {s['model']}  ·  {s['turns']} messages  ·  {s['saved_at']}")
+
         print("")
-        input(f"  {t('press_enter_back')}")
-        return None, None
+        print(c(CYAN, "  Enter number to resume, D+number to delete (e.g. D2), or 0 to go back: "), end="")
+        try:
+            raw = input().strip()
+        except (ValueError, EOFError):
+            return None, None
 
-    print(c(BOLD, f"  {t('menu_resume')}:\n"))
-    for i, s in enumerate(sessions):
-        print(f"  [{i+1}] {s['model']}  ·  {s['turns']} messages  ·  {s['saved_at']}")
+        if not raw or raw == "0":
+            return None, None
 
-    print("")
-    print("  Enter number to resume, or 0 to go back: ", end="")
-    try:
-        choice = int(input().strip())
-    except (ValueError, EOFError):
-        return None, None
+        # Delete flow
+        if raw.upper().startswith("D"):
+            try:
+                idx = int(raw[1:]) - 1
+                if 0 <= idx < len(sessions):
+                    target = sessions[idx]
+                    print(f"\n  Delete '{target['model']}' · {target['saved_at']}? (y/N): ", end="")
+                    confirm = input().strip().lower()
+                    if confirm == "y":
+                        try:
+                            os.remove(target["path"])
+                            print(c(GREEN, "  ✓ Session deleted"))
+                        except Exception as e:
+                            print(c(RED, f"  ✗ Could not delete: {e}"))
+                        time.sleep(0.8)
+                    # Loop back to refresh list
+                    continue
+                else:
+                    print(c(RED, "  Invalid number"))
+                    time.sleep(0.8)
+                    continue
+            except (ValueError, IndexError):
+                print(c(RED, "  Invalid input. Use D1, D2 etc."))
+                time.sleep(0.8)
+                continue
 
-    if choice == 0 or choice > len(sessions):
-        return None, None
+        # Resume flow
+        try:
+            choice = int(raw)
+        except ValueError:
+            print(c(RED, "  Invalid input"))
+            time.sleep(0.8)
+            continue
 
-    session            = sessions[choice - 1]
-    model_name, history = load_session(session["path"])
-    return model_name, history
+        if choice < 1 or choice > len(sessions):
+            print(c(RED, "  Invalid number"))
+            time.sleep(0.8)
+            continue
+
+        session             = sessions[choice - 1]
+        model_name, history = load_session(session["path"])
+        return model_name, history
 
 
 # ── Help screen ───────────────────────────────────────────────────────────────
@@ -525,7 +565,7 @@ def main():
                     if p in seen:
                         continue
                     seen.add(p)
-                     # Match by full filename or partial name
+                    # Match by full filename or partial name
                     if (model_name.lower() == m["filename"].lower() or
                             model_name.lower() in m["filename"].lower() or
                             m["filename"].lower() in model_name.lower()):
