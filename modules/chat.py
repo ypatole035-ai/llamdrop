@@ -372,22 +372,44 @@ def _launch_llama(cmd, prompt):
         clean_cmd.append(arg)
         i += 1
 
+    # Write prompt to temp file — prevents it from being echoed to terminal
+    import tempfile
+    prompt_file = None
+    try:
+        tf = tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False)
+        tf.write(prompt)
+        tf.close()
+        prompt_file = tf.name
+    except Exception:
+        prompt_file = None
+
+    if prompt_file:
+        clean_cmd += ["-f", prompt_file]
+    else:
+        clean_cmd += ["-p", prompt]
+
     clean_cmd += [
-        "-p",               prompt,
-        "--predict",        "300",       # max tokens to generate
-        "--single-turn",                 # exit after one response, no interactive loop
-        "--no-display-prompt",           # don't echo the prompt back
-        "--simple-io",                   # better subprocess compatibility
-        "--temp",           "0.7",
+        "--predict",          "300",
+        "--single-turn",
+        "--no-display-prompt",
+        "--simple-io",
+        "--temp",             "0.7",
+        "-co",                "off",
     ]
 
     try:
         subprocess.run(clean_cmd, env=_get_env())
-        print("")  # newline after model output
+        print("")
     except KeyboardInterrupt:
         print("\n  (interrupted)")
     except Exception as e:
         print(f"\n  Error launching model: {e}")
+    finally:
+        if prompt_file:
+            try:
+                os.remove(prompt_file)
+            except Exception:
+                pass
 
 
 # ── UI helpers ────────────────────────────────────────────────────────────────
@@ -427,4 +449,4 @@ def _handle_exit(history, model_name, session_name):
     except Exception:
         pass
     print("  Goodbye! 🦙")
-    
+        
