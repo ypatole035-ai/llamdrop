@@ -516,16 +516,30 @@ def main():
         elif choice == 4:
             model_name, history = show_sessions()
             if model_name and history:
-                # Search both managed + phone-scanned files
-                all_files  = get_all_gguf_files()
+                # Search managed models first (most reliable), then phone-wide scan
                 model_path = None
-                for m in all_files:
-                    if model_name.lower() in m["filename"].lower():
-                        model_path = m["path"]
+                all_candidates = get_downloaded_models() + get_all_gguf_files()
+                seen = set()
+                for m in all_candidates:
+                    p = m["path"]
+                    if p in seen:
+                        continue
+                    seen.add(p)
+                     # Match by full filename or partial name
+                    if (model_name.lower() == m["filename"].lower() or
+                            model_name.lower() in m["filename"].lower() or
+                            m["filename"].lower() in model_name.lower()):
+                        model_path = p
                         break
+
                 if model_path:
+                    os.system("clear")
+                    print_banner()
+                    print(c(BOLD, f"  Resuming: {model_name}"))
+                    print(c(CYAN, f"  History : {len(history)} messages loaded\n"))
                     cmd, v_info, status = launch_model(model_path, device_profile)
                     if cmd:
+                        input("  Press Enter to continue chatting...")
                         run_chat(cmd, model_name, device_profile,
                                  initial_history=history)
                     else:
