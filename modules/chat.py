@@ -398,9 +398,42 @@ def _launch_llama(cmd, prompt):
     ]
 
     try:
-        subprocess.run(clean_cmd, env=_get_env())
+        # Run llama-cli, filter stdout to remove noise
+        proc = subprocess.Popen(
+            clean_cmd,
+            env=_get_env(),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            text=True,
+            bufsize=1,
+        )
+        _SKIP = (
+            "llama_memory", "load_backend", "load_model", "Exiting",
+            "<|im_start|", "<|im_end|", "> <",
+            "llama_", "ggml_", "build :", "model :",
+            "modalities", "available commands", "/exit", "/regen",
+            "/clear", "/read", "/glob", "[ Prompt:",
+        )
+        skip_until_assistant = True
+        for line in proc.stdout:
+            s = line.rstrip()
+            if not s:
+                continue
+            # Skip everything until after the assistant tag
+            if skip_until_assistant:
+                if "<|im_start|>assistant" in s or s == "<|im_start|>assistant":
+                    skip_until_assistant = False
+                continue
+            if any(s.startswith(p) for p in _SKIP):
+                continue
+            print(f"  {s}")
+        proc.wait()
         print("")
     except KeyboardInterrupt:
+        try:
+            proc.terminate()
+        except Exception:
+            pass
         print("\n  (interrupted)")
     except Exception as e:
         print(f"\n  Error launching model: {e}")
@@ -449,4 +482,4 @@ def _handle_exit(history, model_name, session_name):
     except Exception:
         pass
     print("  Goodbye! 🦙")
-        
+                    
