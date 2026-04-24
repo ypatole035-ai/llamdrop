@@ -1,6 +1,12 @@
 """
 llamdrop - chat.py
 Runs the actual chat session by handing terminal directly to llama-cli.
+
+v0.4 changes:
+- RamMonitor now actually runs during inference (was dead code in v0.3)
+- Context trimming wired to live RAM — trims when RAM hits warn/critical
+- Animated thinking indicator using a background thread
+- /trim command to manually trim context
 """
 
 import os
@@ -8,9 +14,10 @@ import json
 import subprocess
 import sys
 import time
+import threading
 
 SESSIONS_DIR = os.path.expanduser("~/.llamdrop/sessions")
-BIN_DIR = os.path.expanduser("~/.llamdrop/bin")
+BIN_DIR      = os.path.expanduser("~/.llamdrop/bin")
 
 
 def _get_env():
@@ -24,6 +31,8 @@ def get_sessions_dir():
     os.makedirs(SESSIONS_DIR, exist_ok=True)
     return SESSIONS_DIR
 
+
+# ── Session management ────────────────────────────────────────────────────────
 
 def list_sessions():
     d = get_sessions_dir()
@@ -71,6 +80,8 @@ def load_session(path):
         return None, []
 
 
+# ── RAM helpers ───────────────────────────────────────────────────────────────
+
 def get_available_ram_gb():
     try:
         with open("/proc/meminfo") as f:
@@ -83,7 +94,7 @@ def get_available_ram_gb():
     return 0.0
 
 
-def ram_status_line(device_profile):
+def ram_status_line(device_profile=None):
     avail = get_available_ram_gb()
     if avail < 0.8:
         icon = "🔴"; warn = " ⚠ CRITICAL"
@@ -94,12 +105,117 @@ def ram_status_line(device_profile):
     return f"{icon} RAM: {avail}GB free{warn}"
 
 
+# ── Context trimming ──────────────────────────────────────────────────────────
+
+def trim_history(history, keep_turns=4):
+    """
+    Trim conversation history to the last N user/assistant pairs.
+    Always keeps system context. Returns (trimmed_history, trimmed_count).
+    Never trims to fewer than 2 turns (1 pair) to keep the conversation valid.
+    """
+    keep_turns = max(2, keep_turns)
+    if len(history) <= keep_turns:
+        return history, 0
+
+    trimmed_count = len(history) - keep_turns
+    return history[-keep_turns:], trimmed_count
+
+
+def should_trim(avail_ram_gb, warn_threshold=1.5, critical_threshold=0.8):
+    """Return 'critical', 'warn', or None."""
+    if avail_ram_gb < critical_threshold:
+        return "critical"
+    elif avail_ram_gb < warn_threshold:
+        return "warn"
+    return None
+
+
+# ── Thinking indicator (background thread) ────────────────────────────────────
+
+class ThinkingIndicator:
+    """
+    Prints an animated '🦙 Thinking...' spinner in a background thread.
+    Stops as soon as llama-cli hands back control.
+    """
+    FRAMES = ["🦙 Thinking   ", "🦙 Thinking.  ", "🦙 Thinking.. ", "🦙 Thinking..."]
+
+    def __init__(self):
+        self._stop = threading.Event()
+        self._thread = None
+
+    def start(self):
+        self._stop.clear()
+        self._thread = threading.Thread(target=self._spin, daemon=True)
+        self._thread.start()
+
+    def stop(self):
+        self._stop.set()
+        if self._thread:
+            self._thread.join(timeout=2)
+        # Clear the spinner line
+        print("\r" + " " * 20 + "\r", end="", flush=True)
+
+    def _spin(self):
+        i = 0
+        while not self._stop.is_set():
+            frame = self.FRAMES[i % len(self.FRAMES)]
+            print(f"\r  {frame}", end="", flush=True)
+            i += 1
+            self._stop.wait(0.4)
+
+
+# ── RAM monitor (background thread during inference) ─────────────────────────
+
+class _InferenceRamWatcher:
+    """
+    Lightweight RAM watcher that runs while llama-cli is active.
+    Records whether RAM hit warn/critical so we can act after inference.
+    """
+    def __init__(self):
+        self._stop   = threading.Event()
+        self._thread = None
+        self.hit_critical = False
+        self.hit_warn     = False
+        self.min_ram_gb   = float("inf")
+
+    def start(self):
+        self._stop.clear()
+        self.hit_critical = False
+        self.hit_warn     = False
+        self.min_ram_gb   = float("inf")
+        self._thread = threading.Thread(target=self._loop, daemon=True)
+        self._thread.start()
+
+    def stop(self):
+        self._stop.set()
+        if self._thread:
+            self._thread.join(timeout=3)
+
+    def _loop(self):
+        while not self._stop.is_set():
+            avail = get_available_ram_gb()
+            if avail < self.min_ram_gb:
+                self.min_ram_gb = avail
+            if avail < 0.8:
+                self.hit_critical = True
+                self.hit_warn     = True
+            elif avail < 1.5:
+                self.hit_warn = True
+            self._stop.wait(1.5)
+
+
+# ── Main chat loop ────────────────────────────────────────────────────────────
+
 def run_chat(cmd, model_name, device_profile,
              initial_history=None, session_name=None):
     """
-    Launch llama-cli directly in the terminal.
-    Builds the full conversation prompt and hands control to llama-cli.
-    User interacts directly — no output capturing.
+    Launch llama-cli and manage the conversation loop.
+
+    v0.4:
+    - ThinkingIndicator animates while model runs
+    - _InferenceRamWatcher tracks RAM during each call
+    - Auto-trims context when RAM hits warn/critical after a response
+    - Manual /trim command
     """
     history       = initial_history or []
     system_prompt = (
@@ -111,6 +227,9 @@ def run_chat(cmd, model_name, device_profile,
 
     if not session_name:
         session_name = f"session_{time.strftime('%Y%m%d_%H%M%S')}"
+
+    watcher   = _InferenceRamWatcher()
+    indicator = ThinkingIndicator()
 
     try:
         while True:
@@ -126,46 +245,91 @@ def run_chat(cmd, model_name, device_profile,
             if not user_input:
                 continue
 
+            # ── Commands ──────────────────────────────────────────────────────
             if user_input.lower() in ("/quit", "/exit", "/q"):
                 _handle_exit(history, model_name, session_name)
                 break
+
             elif user_input.lower() == "/save":
                 path = save_session(session_name, model_name, history)
                 print(f"  ✓ Session saved: {path}")
                 continue
+
             elif user_input.lower() == "/clear":
                 history = []
                 print("  ✓ Conversation cleared")
                 continue
+
+            elif user_input.lower() == "/trim":
+                before = len(history)
+                history, n = trim_history(history, keep_turns=4)
+                print(f"  ✓ Trimmed {n} old messages (kept {len(history)})")
+                continue
+
             elif user_input.lower() == "/help":
                 _print_chat_help()
                 continue
+
             elif user_input.lower() == "/ram":
                 print(f"  {ram_status_line(device_profile)}")
                 continue
 
-            # Add user message
-            history.append({"role": "user", "content": user_input})
+            # ── Check RAM before sending ──────────────────────────────────────
+            avail_now = get_available_ram_gb()
+            trim_level = should_trim(avail_now)
 
-            # Build prompt
+            if trim_level == "critical":
+                print("  🔴 CRITICAL RAM — auto-trimming context to 2 turns...")
+                history, n = trim_history(history, keep_turns=2)
+                if n:
+                    print(f"  ✓ Trimmed {n} old messages")
+            elif trim_level == "warn":
+                print("  🟡 LOW RAM — auto-trimming context to 4 turns...")
+                history, n = trim_history(history, keep_turns=4)
+                if n:
+                    print(f"  ✓ Trimmed {n} old messages")
+
+            # ── Add user message and build prompt ─────────────────────────────
+            history.append({"role": "user", "content": user_input})
             prompt = _build_prompt(history, system_prompt)
 
-            # Launch llama-cli directly
-            print("\n  🦙 (thinking...)\n")
+            # ── Launch model with indicator + watcher ─────────────────────────
+            print("")
+            indicator.start()
+            watcher.start()
+
             _launch_llama(cmd, prompt)
 
-            # After llama-cli returns, add placeholder to history
-            # (we can't capture output in direct mode)
-            history.append({"role": "assistant", "content": "[response above]"})
+            watcher.stop()
+            indicator.stop()
 
-            # Auto-save every 5 turns
+            # ── Post-inference RAM check ──────────────────────────────────────
+            if watcher.hit_critical:
+                print(f"\n  🔴 RAM hit critical during inference (min: {watcher.min_ram_gb}GB)")
+                print("  Auto-trimming to 2 turns to prevent crash...")
+                history.append({"role": "assistant", "content": "[response above]"})
+                history, _ = trim_history(history, keep_turns=2)
+            elif watcher.hit_warn:
+                print(f"\n  🟡 RAM was low during inference (min: {watcher.min_ram_gb}GB)")
+                history.append({"role": "assistant", "content": "[response above]"})
+                history, n = trim_history(history, keep_turns=6)
+                if n:
+                    print(f"  Context trimmed ({n} old messages removed)")
+            else:
+                history.append({"role": "assistant", "content": "[response above]"})
+
+            # Auto-save every 5 exchanges
             if len(history) % 10 == 0:
                 save_session(session_name, model_name, history)
 
     except Exception as e:
+        watcher.stop()
+        indicator.stop()
         print(f"\n  Error: {e}")
         _handle_exit(history, model_name, session_name)
 
+
+# ── Prompt builder ────────────────────────────────────────────────────────────
 
 def _build_prompt(history, system_prompt=None):
     parts = []
@@ -180,9 +344,10 @@ def _build_prompt(history, system_prompt=None):
     return "\n".join(parts)
 
 
+# ── llama-cli launcher ────────────────────────────────────────────────────────
+
 def _launch_llama(cmd, prompt):
-    """Hand terminal directly to llama-cli."""
-    # Build clean command — remove interactive/color flags
+    """Hand terminal directly to llama-cli for a single-shot inference."""
     clean_cmd = []
     i = 0
     while i < len(cmd):
@@ -213,6 +378,8 @@ def _launch_llama(cmd, prompt):
         print(f"\n  Error launching model: {e}")
 
 
+# ── UI helpers ────────────────────────────────────────────────────────────────
+
 def _print_chat_header(model_name, device_profile):
     ram   = device_profile["ram"]
     avail = ram.get("available_gb", 0)
@@ -228,7 +395,8 @@ def _print_chat_header(model_name, device_profile):
 def _print_chat_help():
     print("\n  Chat commands:")
     print("  /save   — save this conversation")
-    print("  /clear  — clear conversation history")
+    print("  /clear  — clear all conversation history")
+    print("  /trim   — manually trim old context to free RAM")
     print("  /ram    — show current RAM usage")
     print("  /quit   — exit chat")
     print("")
@@ -247,3 +415,4 @@ def _handle_exit(history, model_name, session_name):
     except Exception:
         pass
     print("  Goodbye! 🦙")
+    
