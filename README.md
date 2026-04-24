@@ -1,4 +1,5 @@
-# llamdrop 🦙
+# llamdrop 🦙 ![GitHub stars](https://img.shields.io/github/stars/ypatole035-ai/llamdrop?style=social)
+
 
 > **Run AI on any device. No PC. No subscription. No struggle.**
 
