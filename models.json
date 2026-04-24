@@ -1,0 +1,169 @@
+{
+  "version": "0.4",
+  "last_updated": "2026-04-24",
+  "tiers": {
+    "1": {"name": "Tier 1 — Starter (under 2GB RAM)", "min_ram": 0, "max_ram": 2.0},
+    "2": {"name": "Tier 2 — Standard (2–4GB RAM)",    "min_ram": 2.0, "max_ram": 4.0},
+    "3": {"name": "Tier 3 — Capable (4GB+ RAM)",      "min_ram": 4.0, "max_ram": 99}
+  },
+  "models": [
+    {
+      "id": "smollm2-135m",
+      "name": "SmolLM2 135M",
+      "tier": 1,
+      "hf_repo": "bartowski/SmolLM2-135M-Instruct-GGUF",
+      "best_for": "Ultra-fast responses, simple questions",
+      "languages": ["english"],
+      "license": "Apache 2.0",
+      "note": "Tiniest model. Extremely fast. Very limited reasoning.",
+      "variants": {
+        "Q4_K_M": {"filename": "SmolLM2-135M-Instruct-Q4_K_M.gguf", "download_size_gb": 0.1, "min_ram_gb": 0.5}
+      }
+    },
+    {
+      "id": "smollm2-360m",
+      "name": "SmolLM2 360M",
+      "tier": 1,
+      "hf_repo": "bartowski/SmolLM2-360M-Instruct-GGUF",
+      "best_for": "Basic chat, simple questions",
+      "languages": ["english"],
+      "license": "Apache 2.0",
+      "note": "Small but noticeably smarter than 135M.",
+      "variants": {
+        "Q4_K_M": {"filename": "SmolLM2-360M-Instruct-Q4_K_M.gguf", "download_size_gb": 0.25, "min_ram_gb": 0.8}
+      }
+    },
+    {
+      "id": "qwen2.5-0.5b",
+      "name": "Qwen2.5 0.5B",
+      "tier": 1,
+      "hf_repo": "Qwen/Qwen2.5-0.5B-Instruct-GGUF",
+      "best_for": "Chat, basic reasoning, fast responses",
+      "languages": ["english", "chinese"],
+      "license": "Apache 2.0",
+      "note": "Best Tier 1 model. Surprisingly good for its size.",
+      "variants": {
+        "Q4_K_M": {"filename": "qwen2.5-0.5b-instruct-q4_k_m.gguf", "download_size_gb": 0.4, "min_ram_gb": 1.0},
+        "Q2_K":   {"filename": "qwen2.5-0.5b-instruct-q2_k.gguf",   "download_size_gb": 0.3, "min_ram_gb": 0.8}
+      }
+    },
+    {
+      "id": "qwen2.5-1.5b",
+      "name": "Qwen2.5 1.5B",
+      "tier": 2,
+      "hf_repo": "Qwen/Qwen2.5-1.5B-Instruct-GGUF",
+      "best_for": "General chat, coding help, reasoning",
+      "languages": ["english", "chinese"],
+      "license": "Apache 2.0",
+      "note": "Great balance of speed and intelligence.",
+      "variants": {
+        "Q4_K_M": {"filename": "qwen2.5-1.5b-instruct-q4_k_m.gguf", "download_size_gb": 1.0, "min_ram_gb": 2.0},
+        "Q2_K":   {"filename": "qwen2.5-1.5b-instruct-q2_k.gguf",   "download_size_gb": 0.6, "min_ram_gb": 1.5}
+      }
+    },
+    {
+      "id": "qwen2.5-coder-1.5b",
+      "name": "Qwen2.5 Coder 1.5B",
+      "tier": 2,
+      "hf_repo": "Qwen/Qwen2.5-Coder-1.5B-Instruct-GGUF",
+      "best_for": "Writing and explaining code",
+      "languages": ["english", "chinese"],
+      "license": "Apache 2.0",
+      "note": "Specialized for coding. Best small coding model.",
+      "variants": {
+        "Q4_K_M": {"filename": "qwen2.5-coder-1.5b-instruct-q4_k_m.gguf", "download_size_gb": 1.0, "min_ram_gb": 2.0}
+      }
+    },
+    {
+      "id": "llama3.2-1b",
+      "name": "Llama 3.2 1B",
+      "tier": 2,
+      "hf_repo": "bartowski/Llama-3.2-1B-Instruct-GGUF",
+      "best_for": "General chat, instruction following",
+      "languages": ["english"],
+      "license": "Llama 3.2 Community",
+      "note": "Fast and stable. Good for everyday use.",
+      "variants": {
+        "Q4_K_M": {"filename": "Llama-3.2-1B-Instruct-Q4_K_M.gguf", "download_size_gb": 0.8, "min_ram_gb": 1.6}
+      }
+    },
+    {
+      "id": "gemma2-2b",
+      "name": "Gemma 2 2B",
+      "tier": 2,
+      "hf_repo": "bartowski/gemma-2-2b-it-GGUF",
+      "best_for": "Reasoning, summarization, chat",
+      "languages": ["english"],
+      "license": "Gemma Terms",
+      "note": "Google's efficient small model. Very capable.",
+      "variants": {
+        "Q4_K_M": {"filename": "gemma-2-2b-it-Q4_K_M.gguf", "download_size_gb": 1.6, "min_ram_gb": 3.0}
+      }
+    },
+    {
+      "id": "phi3.5-mini",
+      "name": "Phi-3.5 Mini 3.8B",
+      "tier": 3,
+      "hf_repo": "bartowski/Phi-3.5-mini-instruct-GGUF",
+      "best_for": "Complex reasoning, coding, math",
+      "languages": ["english"],
+      "license": "MIT",
+      "note": "Microsoft's best small model. Punches above its weight.",
+      "variants": {
+        "Q4_K_M": {"filename": "Phi-3.5-mini-instruct-Q4_K_M.gguf", "download_size_gb": 2.2, "min_ram_gb": 4.5}
+      }
+    },
+    {
+      "id": "llama3.2-3b",
+      "name": "Llama 3.2 3B",
+      "tier": 3,
+      "hf_repo": "bartowski/Llama-3.2-3B-Instruct-GGUF",
+      "best_for": "General purpose, writing, analysis",
+      "languages": ["english"],
+      "license": "Llama 3.2 Community",
+      "note": "Well-rounded capable model for devices with 5GB+ RAM.",
+      "variants": {
+        "Q4_K_M": {"filename": "Llama-3.2-3B-Instruct-Q4_K_M.gguf", "download_size_gb": 1.9, "min_ram_gb": 4.0}
+      }
+    },
+    {
+      "id": "qwen2.5-3b",
+      "name": "Qwen2.5 3B",
+      "tier": 3,
+      "hf_repo": "Qwen/Qwen2.5-3B-Instruct-GGUF",
+      "best_for": "Advanced chat, coding, multilingual",
+      "languages": ["english", "chinese", "multilingual"],
+      "license": "Apache 2.0",
+      "note": "Strong multilingual model. Needs 5GB+ RAM.",
+      "variants": {
+        "Q4_K_M": {"filename": "qwen2.5-3b-instruct-q4_k_m.gguf", "download_size_gb": 1.9, "min_ram_gb": 4.0}
+      }
+    },
+    {
+      "id": "deepseek-r1-1.5b",
+      "name": "DeepSeek R1 Distill 1.5B",
+      "tier": 2,
+      "hf_repo": "bartowski/DeepSeek-R1-Distill-Qwen-1.5B-GGUF",
+      "best_for": "Step-by-step reasoning, math, logic",
+      "languages": ["english", "chinese"],
+      "license": "MIT",
+      "note": "Reasoning-focused model. Great for problem solving.",
+      "variants": {
+        "Q4_K_M": {"filename": "DeepSeek-R1-Distill-Qwen-1.5B-Q4_K_M.gguf", "download_size_gb": 1.0, "min_ram_gb": 2.0}
+      }
+    },
+    {
+      "id": "mistral-7b",
+      "name": "Mistral 7B v0.3",
+      "tier": 3,
+      "hf_repo": "bartowski/Mistral-7B-Instruct-v0.3-GGUF",
+      "best_for": "High quality responses, writing, analysis",
+      "languages": ["english"],
+      "license": "Apache 2.0",
+      "note": "Needs 6GB+ RAM. Best quality if your device can handle it.",
+      "variants": {
+        "Q2_K": {"filename": "Mistral-7B-Instruct-v0.3-Q2_K.gguf", "download_size_gb": 2.7, "min_ram_gb": 5.0}
+      }
+    }
+  ]
+}

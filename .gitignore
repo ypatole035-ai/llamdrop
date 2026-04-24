@@ -1,0 +1,43 @@
+# Model files (too large for git - can be gigabytes)
+*.gguf
+*.bin
+*.safetensors
+*.ggml
+
+# llamdrop runtime data
+llamdrop_data/
+sessions/
+~/.llamdrop/
+.llamdrop_cache/
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.env
+venv/
+.venv/
+*.egg-info/
+
+# llama.cpp build artifacts
+llama.cpp/
+build/
+*.so
+*.o
+*.a
+bin/
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs
+*.log
+logs/
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
