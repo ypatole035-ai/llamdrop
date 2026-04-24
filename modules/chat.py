@@ -398,36 +398,50 @@ def _launch_llama(cmd, prompt):
     ]
 
     try:
-        # Run llama-cli, filter stdout to remove noise
+        # Capture stderr (where llama-cli prints its banner/noise) and filter it.
+        # stdout flows directly to terminal so the model response prints live.
         proc = subprocess.Popen(
             clean_cmd,
             env=_get_env(),
             stdout=subprocess.PIPE,
-            stderr=subprocess.DEVNULL,
+            stderr=subprocess.PIPE,
             text=True,
             bufsize=1,
         )
+
         _SKIP = (
-            "llama_memory", "load_backend", "load_model", "Exiting",
-            "<|im_start|", "<|im_end|", "> <",
+            "llama_memory", "load_backend", "Exiting",
             "llama_", "ggml_", "build :", "model :",
-            "modalities", "available commands", "/exit", "/regen",
+            "modalities :", "available commands", "/exit", "/regen",
             "/clear", "/read", "/glob", "[ Prompt:",
+            "<|im_start|", "<|im_end|", "> <",
         )
-        skip_until_assistant = True
+
+        import threading
+
+        def _drain_stderr():
+            for line in proc.stderr:
+                pass  # discard all stderr (banner, backend load messages)
+
+        t = threading.Thread(target=_drain_stderr, daemon=True)
+        t.start()
+
+        skip_until_assistant_done = True
         for line in proc.stdout:
             s = line.rstrip()
-            if not s:
+            # Skip the prompt echo block entirely
+            if skip_until_assistant_done:
+                if s == "<|im_start|>assistant" or s.endswith(">assistant"):
+                    skip_until_assistant_done = False
                 continue
-            # Skip everything until after the assistant tag
-            if skip_until_assistant:
-                if "<|im_start|>assistant" in s or s == "<|im_start|>assistant":
-                    skip_until_assistant = False
-                continue
+            # Skip known noise lines
             if any(s.startswith(p) for p in _SKIP):
                 continue
-            print(f"  {s}")
+            if s:
+                print(f"  {s}")
+
         proc.wait()
+        t.join(timeout=2)
         print("")
     except KeyboardInterrupt:
         try:
@@ -482,4 +496,4 @@ def _handle_exit(history, model_name, session_name):
     except Exception:
         pass
     print("  Goodbye! 🦙")
-                    
+                
