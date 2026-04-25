@@ -6,7 +6,7 @@
 [![Platform](https://img.shields.io/badge/Platform-Android%20%7C%20Linux%20%7C%20RPi%20%7C%20Any%20Low--End%20Device-green.svg)]()
 [![Status](https://img.shields.io/badge/Status-Active-brightgreen.svg)]()
 [![Free Forever](https://img.shields.io/badge/Free-Forever-brightgreen.svg)]()
-[![Version](https://img.shields.io/badge/Version-0.4.0-blue.svg)]()
+[![Version](https://img.shields.io/badge/Version-0.5.0-blue.svg)]()
 
 ---
 
@@ -72,9 +72,12 @@ That's it. Two commands. No compilation. No configuration. No account needed.
   - Trims moderately when RAM is low (<1.5GB free)
   - Manual `/trim` command available anytime
 - 🦙 **Live thinking indicator** — animated spinner while the model generates
-- 💾 **Session save/load** — resume conversations where you left off
+- 💾 **Session save/load/delete** — resume conversations where you left off, delete old sessions
 - ⚠️ **RAM monitor** — live warning if memory gets dangerous during chat; auto-trim triggers mid-inference
 - 📂 **Phone-wide GGUF scanner** — finds models you already have in Downloads, Documents, etc. — no need to re-download
+- 📊 **Model benchmarking** — tokens/second score recorded after each run, shown in the browser as ⚡ X t/s
+- 🆙 **Self-update** — `llamdrop update` pulls the latest version from GitHub without reinstalling
+- 🩺 **Health check** — `llamdrop doctor` diagnoses your install and reports any issues with fixes
 - 🌐 **Multi-language UI** — English, Hindi, Spanish, Portuguese
 
 ---
@@ -125,9 +128,10 @@ llamdrop runs on any device that can run Python 3 in a Linux terminal.
 
 ```
 llamdrop/
-├── llamdrop.py          # Main entry point
+├── llamdrop.py          # Main entry point + CLI (update, doctor, version)
 ├── install.sh           # One-line installer
 ├── models.json          # Verified model catalog
+├── CHANGELOG.md         # Version history
 ├── modules/
 │   ├── device.py        # Hardware detection (RAM, CPU, OS)
 │   ├── browser.py       # Model browser — verified catalog + HF live search
@@ -137,7 +141,9 @@ llamdrop/
 │   ├── ram_monitor.py   # RAM tracking utilities
 │   ├── hf_search.py     # Live HuggingFace search
 │   ├── i18n.py          # Multi-language UI strings
-│   └── updater.py       # Background catalog + version updater
+│   ├── updater.py       # Self-update + background catalog updater
+│   ├── benchmarks.py    # Tokens/sec benchmark storage and display
+│   └── doctor.py        # Install health checker
 └── docs/
     ├── CONTRIBUTING.md  # How to contribute
     └── DEVICES.md       # Community device compatibility list
@@ -159,7 +165,7 @@ llamdrop/
 - [x] Multi-language UI (English, Hindi, Spanish, Portuguese)
 - [x] Background catalog + version updater
 
-### v0.4 — Current
+### v0.4 — Done
 - [x] **Phone-wide GGUF scanner** — scans Downloads, Documents, and common paths for GGUFs you already have; no re-download needed
 - [x] **Smart quantization at download** — re-checks live RAM at the moment you download, picks Q4/Q5/Q2 based on what actually fits right now
 - [x] **Vulkan GPU acceleration** — auto-detects Adreno (Qualcomm), Mali (ARM), and desktop Vulkan; offloads layers safely based on available RAM
@@ -169,13 +175,25 @@ llamdrop/
 - [x] **Manual `/trim` command** — trim context on demand without clearing the whole conversation
 - [x] **Vulkan status in main menu** — GPU type shown in the header bar alongside RAM
 - [x] **Resume session searches phone-wide** — resumed sessions find the model even if it's outside `~/.llamdrop/models/`
+- [x] **Session delete** — delete saved sessions directly from the Resume screen (type D2 to delete session 2)
+- [x] **18 models in catalog** — added TinyLlama, SmolLM2 1.7B, Phi-3 Mini, Aya Expanse, Qwen2.5 Coder, DeepSeek R1
 
-### v0.5 — Community
-- [ ] Web-based model catalog (GitHub Pages)
+### v0.5 — Done
+- [x] **`llamdrop update`** — self-update command, pulls latest code from GitHub without reinstalling
+- [x] **`llamdrop doctor`** — diagnoses your install: binary, RAM, storage, network, Python, permissions
+- [x] **Model benchmarking** — tokens/second score recorded after each chat, shown as ⚡ X t/s in the browser
+- [x] **`llamdrop version` / `llamdrop help`** — CLI commands without opening the full UI
+- [x] **🆙 Update + 🩺 Doctor in main menu** — accessible without typing commands
+- [x] **CHANGELOG.md** — full version history on GitHub
+- [x] **Banner fixed** — no more garbled blocks on startup
+
+### v0.6 — Next
+- [ ] Web-based model catalog (GitHub Pages) — browse models before installing
 - [ ] Community device profile submissions to models.json
 - [ ] Automated model testing pipeline before catalog addition
-- [ ] Confirmed devices list per model in models.json
 - [ ] Arabic UI language support
+- [ ] Chat export to .txt file
+- [ ] Confirmed devices list per model in models.json
 
 ---
 
