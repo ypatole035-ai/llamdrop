@@ -11,7 +11,7 @@ import curses
 import json
 import time
 
-VERSION = "0.4.0"
+VERSION = "0.5.0"
 
 # Ensure modules directory is on path
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -48,16 +48,11 @@ def c(color, text):
 
 def print_banner():
     os.system("clear")
-    print(c(BLUE + BOLD, """
-  ██╗     ██╗      █████╗ ███╗   ███╗██████╗ ██████╗  ██████╗ ██████╗
-  ██║     ██║     ██╔══██╗████╗ ████║██╔══██╗██╔══██╗██╔═══██╗██╔══██╗
-  ██║     ██║     ███████║██╔████╔██║██║  ██║██████╔╝██║   ██║██████╔╝
-  ██║     ██║     ██╔══██║██║╚██╔╝██║██║  ██║██╔══██╗██║   ██║██╔═══╝
-  ███████╗███████╗██║  ██║██║ ╚═╝ ██║██████╔╝██║  ██║╚██████╔╝██║
-  ╚══════╝╚══════╝╚═╝  ╚═╝╚═╝     ╚═╝╚═════╝ ╚═╝  ╚═╝ ╚═════╝ ╚═╝
-    """))
-    print(c(CYAN,   f"  {t('tagline')}"))
-    print(c(YELLOW, f"  v{VERSION} · {t('free_forever')} · github.com/ypatole035-ai/llamdrop"))
+    # Plain text banner — works on all terminals including Termux
+    print("")
+    print(c(BLUE + BOLD,   "  ██ llamdrop"))
+    print(c(CYAN,          f"  {t('tagline')}"))
+    print(c(YELLOW,        f"  v{VERSION} · {t('free_forever')} · github.com/ypatole035-ai/llamdrop"))
     print("")
     print("  " + "━" * 54)
     print("")
@@ -73,6 +68,7 @@ def get_menu_items():
         ("📂", t("menu_mymodels"), t("desc_mymodels")),
         ("💾", t("menu_resume"),   t("desc_resume")),
         ("🔧", t("menu_device"),   t("desc_device")),
+        ("🩺", "Doctor",           "Check your install for issues"),
         ("🆙", "Update llamdrop",  "Pull latest version from GitHub"),
         ("🌐", "Language / भाषा",  "Change display language"),
         ("❓", t("menu_help"),     t("desc_help")),
@@ -461,14 +457,19 @@ def main():
         elif cmd in ("--version", "-v", "version"):
             print(f"llamdrop v{VERSION}")
             sys.exit(0)
+        elif cmd in ("doctor", "check"):
+            from doctor import run_doctor
+            run_doctor()
+            input("  Press Enter to exit...")
+            sys.exit(0)
         elif cmd in ("--help", "-h", "help"):
             print(f"llamdrop v{VERSION}")
             print("Usage: llamdrop [command]")
             print("")
             print("Commands:")
             print("  update    — update llamdrop to the latest version")
-            print("  version   — show current version")
             print("  doctor    — check your install for issues")
+            print("  version   — show current version")
             print("")
             print("Run without arguments to open the interactive menu.")
             sys.exit(0)
@@ -631,8 +632,15 @@ def main():
         elif choice == 5:
             show_device_info(device_profile, vulkan_info)
 
-        # 6 — Update
+        # 6 — Doctor
         elif choice == 6:
+            os.system("clear")
+            from doctor import run_doctor
+            run_doctor()
+            input(f"  {t('press_enter_back')}")
+
+        # 7 — Update
+        elif choice == 7:
             os.system("clear")
             print_banner()
             print(c(BOLD, "  Update llamdrop\n"))
@@ -640,19 +648,19 @@ def main():
             run_self_update(VERSION, verbose=True)
             input(f"\n  {t('press_enter_back')}")
 
-        # 7 — Language
-        elif choice == 7:
+        # 8 — Language
+        elif choice == 8:
             os.system("clear")
             print_banner()
             choose_language_menu()
             load_language()
 
-        # 8 — Help
-        elif choice == 8:
+        # 9 — Help
+        elif choice == 9:
             show_help()
 
-        # 9 — Quit
-        elif choice == 9:
+        # 10 — Quit
+        elif choice == 10:
             os.system("clear")
             print(c(BLUE + BOLD, "\n  🦙 llamdrop"))
             print(c(CYAN,   f"  {t('goodbye')}"))
