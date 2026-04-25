@@ -73,6 +73,7 @@ def get_menu_items():
         ("📂", t("menu_mymodels"), t("desc_mymodels")),
         ("💾", t("menu_resume"),   t("desc_resume")),
         ("🔧", t("menu_device"),   t("desc_device")),
+        ("🆙", "Update llamdrop",  "Pull latest version from GitHub"),
         ("🌐", "Language / भाषा",  "Change display language"),
         ("❓", t("menu_help"),     t("desc_help")),
         ("✕",  t("menu_quit"),     ""),
@@ -439,6 +440,39 @@ def show_help():
 # ── Main loop ─────────────────────────────────────────────────────────────────
 
 def main():
+    # Handle CLI commands before loading UI
+    if len(sys.argv) > 1:
+        cmd = sys.argv[1].lower()
+        if cmd == "update":
+            from updater import run_self_update
+            import importlib, sys as _sys
+            # Read current version from installed file
+            try:
+                spec = importlib.util.spec_from_file_location(
+                    "llamdrop_ver",
+                    os.path.join(os.path.dirname(os.path.abspath(__file__)), "llamdrop.py")
+                )
+                current_v = VERSION
+            except Exception:
+                current_v = VERSION
+            result = run_self_update(current_v)
+            print("")
+            sys.exit(0 if result in ("updated", "current") else 1)
+        elif cmd in ("--version", "-v", "version"):
+            print(f"llamdrop v{VERSION}")
+            sys.exit(0)
+        elif cmd in ("--help", "-h", "help"):
+            print(f"llamdrop v{VERSION}")
+            print("Usage: llamdrop [command]")
+            print("")
+            print("Commands:")
+            print("  update    — update llamdrop to the latest version")
+            print("  version   — show current version")
+            print("  doctor    — check your install for issues")
+            print("")
+            print("Run without arguments to open the interactive menu.")
+            sys.exit(0)
+
     load_language()
 
     print(f"  {t('loading')}")
@@ -594,19 +628,28 @@ def main():
         elif choice == 5:
             show_device_info(device_profile, vulkan_info)
 
-        # 6 — Language
+        # 6 — Update
         elif choice == 6:
+            os.system("clear")
+            print_banner()
+            print(c(BOLD, "  Update llamdrop\n"))
+            from updater import run_self_update
+            run_self_update(VERSION, verbose=True)
+            input(f"\n  {t('press_enter_back')}")
+
+        # 7 — Language
+        elif choice == 7:
             os.system("clear")
             print_banner()
             choose_language_menu()
             load_language()
 
-        # 7 — Help
-        elif choice == 7:
+        # 8 — Help
+        elif choice == 8:
             show_help()
 
-        # 8 — Quit
-        elif choice == 8:
+        # 9 — Quit
+        elif choice == 9:
             os.system("clear")
             print(c(BLUE + BOLD, "\n  🦙 llamdrop"))
             print(c(CYAN,   f"  {t('goodbye')}"))
