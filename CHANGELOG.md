@@ -4,6 +4,17 @@ All notable changes to llamdrop are documented here.
 
 ---
 
+## v0.6.1 — 2026-04-25
+
+### Fixed
+- Battery monitoring import error on devices without battery sysfs path
+- Config file not created on first install in some Termux environments
+- Prompt format fallback to chatml when model has no `prompt_format` field
+- `/export` command now works when Downloads folder path differs by device
+- updater.py correctly includes `config.py` and `battery.py` in UPDATE_FILES
+
+---
+
 ## v0.6.0 — 2026-04-25
 
 ### New
