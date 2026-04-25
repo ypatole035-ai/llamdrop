@@ -10,7 +10,9 @@ import subprocess
 
 
 def get_ram_info():
-    """Read RAM from /proc/meminfo. Returns dict with total and available in GB."""
+    """Read RAM from /proc/meminfo. Returns dict with total and available in GB.
+    Also reads SwapFree (zram on Android) and adds it to effective available RAM.
+    """
     try:
         with open("/proc/meminfo", "r") as f:
             lines = f.readlines()
@@ -27,14 +29,31 @@ def get_ram_info():
         avail_gb  = round(mem.get("MemAvailable", 0) / 1024 / 1024, 1)
         used_gb   = round(total_gb - avail_gb, 1)
 
+        # Include swap/zram (Android zram gives real extra headroom)
+        # Cap swap contribution at 1.5GB — beyond that it's too slow to be useful
+        swap_free_kb  = mem.get("SwapFree", 0)
+        swap_total_kb = mem.get("SwapTotal", 0)
+        swap_free_gb  = round(min(swap_free_kb, 1536 * 1024) / 1024 / 1024, 1)
+
+        # Effective available = physical free + usable swap
+        # Use a 0.6 weight on swap since it's slower than RAM
+        effective_avail_gb = round(avail_gb + swap_free_gb * 0.6, 1)
+
         return {
-            "total_gb":     total_gb,
-            "available_gb": avail_gb,
-            "used_gb":      used_gb,
-            "ok":           True
+            "total_gb":          total_gb,
+            "available_gb":      avail_gb,
+            "effective_avail_gb": effective_avail_gb,
+            "used_gb":           used_gb,
+            "swap_free_gb":      swap_free_gb,
+            "swap_total_gb":     round(swap_total_kb / 1024 / 1024, 1),
+            "ok":                True
         }
     except Exception as e:
-        return {"total_gb": 0, "available_gb": 0, "used_gb": 0, "ok": False, "error": str(e)}
+        return {
+            "total_gb": 0, "available_gb": 0, "effective_avail_gb": 0,
+            "used_gb": 0, "swap_free_gb": 0, "swap_total_gb": 0,
+            "ok": False, "error": str(e)
+        }
 
 
 def get_cpu_info():
@@ -218,7 +237,8 @@ def get_device_profile():
     }
 
     # Determine which model tier this device can handle
-    avail = ram.get("available_gb", 0)
+    # Use effective_avail_gb which includes zram/swap contribution
+    avail = ram.get("effective_avail_gb", ram.get("available_gb", 0))
     if avail >= 5.0:
         profile["max_tier"] = 3
     elif avail >= 3.0:
@@ -237,12 +257,14 @@ def format_profile_summary(profile):
     cpu   = profile["cpu"]
     avail = ram.get("available_gb", 0)
     total = ram.get("total_gb", 0)
+    swap  = ram.get("swap_free_gb", 0)
     cores = cpu.get("cores", 1)
     chip  = cpu.get("chip", "Unknown")
     plat  = profile.get("platform", "unknown")
 
+    swap_str = f" +{swap}GB swap" if swap > 0 else ""
     return (
         f"{chip} · {cores} cores · "
-        f"{avail}GB free / {total}GB RAM · "
+        f"{avail}GB free / {total}GB RAM{swap_str} · "
         f"{plat}"
     )

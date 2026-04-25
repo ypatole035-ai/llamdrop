@@ -112,17 +112,67 @@ get_llama_binary() {
     warn "Termux package not available, trying direct download..."
   fi
 
-  # Method 2: Direct download from GitHub releases
-  LLAMA_RELEASE="b8862"
-  LLAMA_BIN_URL="https://github.com/ggml-org/llama.cpp/releases/download/${LLAMA_RELEASE}/llama-${LLAMA_RELEASE}-bin-android-arm64.tar.gz"
-  LLAMA_TAR="$HOME/.llamdrop/llama-android.tar.gz"
+  # Method 2: System package manager for Linux distros
+  if [ "$PLATFORM" != "termux" ]; then
+    info "Trying system package manager for llama-cli..."
+    SYSTEM_BIN=$(which llama-cli 2>/dev/null)
+    if [ -n "$SYSTEM_BIN" ] && [ -f "$SYSTEM_BIN" ]; then
+      cp "$SYSTEM_BIN" "$BIN_DIR/llama-cli"
+      chmod +x "$BIN_DIR/llama-cli"
+      success "llama-cli ready from system!"
+      return 0
+    fi
+  fi
 
-  info "Downloading prebuilt binary (~60MB)..."
+  # Method 3: Direct download from GitHub releases — pick correct binary for arch
+  LLAMA_RELEASE="b8862"
+
+  # Detect correct binary URL based on architecture
+  if [ "$ARCH" = "aarch64" ] || [ "$ARCH" = "arm64" ]; then
+    if [ "$PLATFORM" = "termux" ]; then
+      # Android ARM64
+      LLAMA_BIN_URL="https://github.com/ggml-org/llama.cpp/releases/download/${LLAMA_RELEASE}/llama-${LLAMA_RELEASE}-bin-android-arm64.tar.gz"
+      LLAMA_TAR="$HOME/.llamdrop/llama-bin.tar.gz"
+    else
+      # Linux ARM64 (Raspberry Pi 4/5, Orange Pi, etc.)
+      LLAMA_BIN_URL="https://github.com/ggml-org/llama.cpp/releases/download/${LLAMA_RELEASE}/llama-${LLAMA_RELEASE}-bin-ubuntu-arm64.tar.gz"
+      LLAMA_TAR="$HOME/.llamdrop/llama-bin.tar.gz"
+    fi
+  elif [ "$ARCH" = "x86_64" ] || [ "$ARCH" = "amd64" ]; then
+    # Linux x86_64 (laptops, desktops)
+    LLAMA_BIN_URL="https://github.com/ggml-org/llama.cpp/releases/download/${LLAMA_RELEASE}/llama-${LLAMA_RELEASE}-bin-ubuntu-x64.tar.gz"
+    LLAMA_TAR="$HOME/.llamdrop/llama-bin.tar.gz"
+  elif [ "$ARCH" = "armv7l" ] || [ "$ARCH" = "armv7" ]; then
+    # 32-bit ARM — try Termux pkg or build from source fallback
+    warn "32-bit ARM detected. Trying pkg install as fallback..."
+    if [ "$PLATFORM" = "termux" ]; then
+      pkg install -y llama-cpp 2>/dev/null
+      LLAMA_BIN=$(which llama-cli 2>/dev/null)
+      if [ -n "$LLAMA_BIN" ]; then
+        cp "$LLAMA_BIN" "$BIN_DIR/llama-cli"
+        chmod +x "$BIN_DIR/llama-cli"
+        success "llama-cli ready!"
+        return 0
+      fi
+    fi
+    error "No prebuilt binary for 32-bit ARM. Try: pkg install llama-cpp"
+    exit 1
+  else
+    warn "Unknown arch: $ARCH — attempting x86_64 binary as fallback"
+    LLAMA_BIN_URL="https://github.com/ggml-org/llama.cpp/releases/download/${LLAMA_RELEASE}/llama-${LLAMA_RELEASE}-bin-ubuntu-x64.tar.gz"
+    LLAMA_TAR="$HOME/.llamdrop/llama-bin.tar.gz"
+  fi
+
+  info "Downloading prebuilt binary for $ARCH (~60MB)..."
   curl -L --retry 3 --retry-delay 2 "$LLAMA_BIN_URL" -o "$LLAMA_TAR" 2>/dev/null
 
   if [ $? -ne 0 ] || [ ! -s "$LLAMA_TAR" ]; then
     error "Download failed. Check your internet connection."
-    error "You can also try manually: pkg install llama-cpp"
+    if [ "$PLATFORM" = "termux" ]; then
+      error "You can also try manually: pkg install llama-cpp"
+    else
+      error "You can also try manually: sudo apt install llama-cpp"
+    fi
     exit 1
   fi
 
@@ -143,7 +193,12 @@ get_llama_binary() {
     rm -rf "$HOME/.llamdrop/llama_bin_extract" "$LLAMA_TAR"
     success "llama-cli ready!"
   else
-    error "Could not find binary. Try: pkg install llama-cpp"
+    error "Could not find binary in archive."
+    if [ "$PLATFORM" = "termux" ]; then
+      error "Try: pkg install llama-cpp"
+    else
+      error "Try: sudo apt install llama-cpp"
+    fi
     exit 1
   fi
 }
@@ -163,7 +218,9 @@ install_llamdrop() {
   done
 
   for module in device.py browser.py downloader.py launcher.py chat.py \
-                hf_search.py ram_monitor.py updater.py i18n.py; do
+                hf_search.py ram_monitor.py updater.py i18n.py \
+                benchmarks.py doctor.py \
+                config.py battery.py; do
     curl -sL "$LLAMDROP_RAW/modules/$module" \
       -o "$LLAMDROP_DIR/modules/$module" 2>/dev/null || \
     wget -q "$LLAMDROP_RAW/modules/$module" \

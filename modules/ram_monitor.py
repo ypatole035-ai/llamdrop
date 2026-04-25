@@ -26,7 +26,7 @@ def read_available_ram_gb():
 
 
 def read_ram_full():
-    """Returns dict: total_gb, available_gb, used_gb, used_pct."""
+    """Returns dict: total_gb, available_gb, used_gb, used_pct, swap_free_gb."""
     try:
         mem = {}
         with open("/proc/meminfo") as f:
@@ -44,14 +44,18 @@ def read_ram_full():
         used_gb  = round(used_kb  / 1024 / 1024, 1)
         used_pct = int(used_kb / total_kb * 100) if total_kb > 0 else 0
 
+        swap_free_kb = mem.get("SwapFree", 0)
+        swap_free_gb = round(min(swap_free_kb, 1536 * 1024) / 1024 / 1024, 1)
+
         return {
-            "total_gb": total_gb,
-            "avail_gb": avail_gb,
-            "used_gb":  used_gb,
-            "used_pct": used_pct,
+            "total_gb":   total_gb,
+            "avail_gb":   avail_gb,
+            "used_gb":    used_gb,
+            "used_pct":   used_pct,
+            "swap_free_gb": swap_free_gb,
         }
     except Exception:
-        return {"total_gb": 0, "avail_gb": 0, "used_gb": 0, "used_pct": 0}
+        return {"total_gb": 0, "avail_gb": 0, "used_gb": 0, "used_pct": 0, "swap_free_gb": 0}
 
 
 # ── RAM status rendering ──────────────────────────────────────────────────────
@@ -179,6 +183,10 @@ def print_ram_dashboard():
     print(f"  Used:  {info['used_gb']}GB  ({info['used_pct']}%)")
     print(f"  Free:  {info['avail_gb']}GB")
     print(f"  Total: {info['total_gb']}GB")
+
+    swap = info.get("swap_free_gb", 0)
+    if swap > 0:
+        print(f"  Swap:  {swap}GB free (zram/swap)")
 
     level = ram_warning_level(info["avail_gb"])
     if level == "critical":

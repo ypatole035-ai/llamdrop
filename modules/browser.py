@@ -9,6 +9,11 @@ import curses
 import json
 import os
 
+try:
+    from benchmarks import get_all_benchmarks
+except ImportError:
+    def get_all_benchmarks(): return {}
+
 
 # ── Load model catalog ────────────────────────────────────────────────────────
 
@@ -149,7 +154,7 @@ def draw_footer(stdscr, height, width):
     stdscr.attroff(curses.color_pair(1))
 
 
-def draw_model_list(stdscr, models, selected, scroll_offset, list_top, list_height, width):
+def draw_model_list(stdscr, models, selected, scroll_offset, list_top, list_height, width, benchmarks=None):
     """Draw the scrollable model list."""
     visible = models[scroll_offset: scroll_offset + list_height]
 
@@ -179,8 +184,14 @@ def draw_model_list(stdscr, models, selected, scroll_offset, list_top, list_heig
         label = COMPAT_LABELS.get(compat, "")
         v_tag = " ✓" if verified else " ?"
 
+        # Benchmark score for this variant
+        bench_filename = model.get("_best_variant", {}).get("filename", "")
+        bench_data     = (benchmarks or {}).get(bench_filename, {})
+        tps            = bench_data.get("gen_tps", 0)
+        bench_str      = f" ⚡{int(tps)}t/s" if tps > 0 else ""
+
         # Build the line
-        line_left  = f"  {icon} {name} ({params}){v_tag}"
+        line_left  = f"  {icon} {name} ({params}){v_tag}{bench_str}"
         line_right = f"{variant}  {size_dl}GB↓  {size_ram}GB RAM  {label}  "
         padding    = width - len(line_left) - len(line_right)
         if padding < 1:
@@ -256,6 +267,7 @@ def run_browser(stdscr, models, device_profile):
 
     selected      = 0
     scroll_offset = 0
+    benchmarks    = get_all_benchmarks()
 
     while True:
         stdscr.clear()
@@ -284,7 +296,7 @@ def run_browser(stdscr, models, device_profile):
             scroll_offset = selected - list_height + 1
 
         draw_header(stdscr, device_profile, width)
-        draw_model_list(stdscr, models, selected, scroll_offset, list_top, list_height, width)
+        draw_model_list(stdscr, models, selected, scroll_offset, list_top, list_height, width, benchmarks)
 
         current_model = models[selected] if models else None
         draw_detail_panel(stdscr, current_model, detail_top, width)
