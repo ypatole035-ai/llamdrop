@@ -436,9 +436,10 @@ def _launch_llama(cmd, prompt):
 
         import threading
 
+        stderr_lines = []
         def _drain_stderr():
             for line in proc.stderr:
-                pass  # discard all stderr (banner, backend load messages)
+                stderr_lines.append(line)  # collect for tps parsing
 
         t = threading.Thread(target=_drain_stderr, daemon=True)
         t.start()
@@ -473,7 +474,9 @@ def _launch_llama(cmd, prompt):
                 continue
             print(f"  {s}")
 
-        return raw_output  # Return full output for tps parsing
+        # Return stderr for tps parsing (that's where llama-cli prints the stats line)
+        tps_source = ''.join(stderr_lines)
+        return tps_source if tps_source else raw_output
 
         t.join(timeout=2)
         print("")
@@ -483,8 +486,10 @@ def _launch_llama(cmd, prompt):
         except Exception:
             pass
         print("\n  (interrupted)")
+        return None  # No benchmark on interrupt
     except Exception as e:
         print(f"\n  Error launching model: {e}")
+        return None  # No benchmark on error
     finally:
         if prompt_file:
             try:
@@ -530,3 +535,4 @@ def _handle_exit(history, model_name, session_name):
     except Exception:
         pass
     print("  Goodbye! 🦙")
+            
