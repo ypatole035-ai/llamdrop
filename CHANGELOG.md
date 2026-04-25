@@ -8,15 +8,19 @@ All notable changes to llamdrop are documented here.
 
 ### New
 - `llamdrop update` — self-update command, pulls latest code from GitHub without reinstalling
-- `llamdrop doctor` — diagnoses install issues (binary, RAM, storage, connectivity)
-- Model benchmarking — tokens/second score stored per model after first run
+- `llamdrop doctor` — diagnoses install issues: binary, RAM, storage, directories, network, Python, Termux storage permission, benchmarks
 - `llamdrop version` and `llamdrop help` CLI commands
-- Update option added to main menu (🆙)
+- Model benchmarking — tokens/second score captured from llama-cli output after each inference, stored in `benchmarks.json`, shown as ⚡ X t/s in the browser
+- 🆙 Update llamdrop option in main menu
+- 🩺 Doctor option in main menu
 
 ### Improved
-- Changelog shown during update so you know what changed before confirming
-- Atomic file writes during update (no partial file corruption)
-- Models/sessions/bin never touched during updates
+- Changelog shown during `llamdrop update` so you know what changed before confirming
+- Atomic file writes during update — no partial file corruption if connection drops
+- models/, sessions/, bin/ never touched during updates
+- Session delete — type D2 in Resume screen to delete session 2, list refreshes automatically
+- Banner fixed — replaced broken Unicode block art with clean plain text that works on all terminals
+- CHANGELOG.md added to repo root
 
 ---
 
@@ -53,3 +57,4 @@ All notable changes to llamdrop are documented here.
 - Multi-language UI (English, Hindi, Spanish, Portuguese)
 - Background catalog and version updater
 - 12 verified models across 3 tiers
+- 
