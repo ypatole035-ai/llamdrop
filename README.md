@@ -6,7 +6,7 @@
 [![Platform](https://img.shields.io/badge/Platform-Android%20%7C%20Linux%20%7C%20RPi%20%7C%20Any%20Low--End%20Device-green.svg)]()
 [![Status](https://img.shields.io/badge/Status-Active-brightgreen.svg)]()
 [![Free Forever](https://img.shields.io/badge/Free-Forever-brightgreen.svg)]()
-[![Version](https://img.shields.io/badge/Version-0.5.0-blue.svg)]()
+[![Version](https://img.shields.io/badge/Version-0.6.1-blue.svg)]()
 
 ---
 
@@ -78,6 +78,10 @@ That's it. Two commands. No compilation. No configuration. No account needed.
 - 📊 **Model benchmarking** — tokens/second score recorded after each run, shown in the browser as ⚡ X t/s
 - 🆙 **Self-update** — `llamdrop update` pulls the latest version from GitHub without reinstalling
 - 🩺 **Health check** — `llamdrop doctor` diagnoses your install and reports any issues with fixes
+- ⚙️ **Config file** — `~/.llamdrop/config.json` to override threads, context, temperature, system prompt
+- 📤 **Chat export** — `/export` in chat saves conversation to Downloads as markdown
+- 🔋 **Battery monitoring** — shows % drop per inference, warns on low battery before chat starts
+- 🎯 **Prompt format auto-detect** — correct template per model (ChatML, Llama3, Gemma, Phi3)
 - 🌐 **Multi-language UI** — English, Hindi, Spanish, Portuguese
 
 ---
@@ -143,7 +147,9 @@ llamdrop/
 │   ├── i18n.py          # Multi-language UI strings
 │   ├── updater.py       # Self-update + background catalog updater
 │   ├── benchmarks.py    # Tokens/sec benchmark storage and display
-│   └── doctor.py        # Install health checker
+│   ├── doctor.py        # Install health checker
+│   ├── config.py        # User config file — override auto-detected settings
+│   └── battery.py       # Battery monitoring during inference
 └── docs/
     ├── CONTRIBUTING.md  # How to contribute
     └── DEVICES.md       # Community device compatibility list
@@ -187,12 +193,20 @@ llamdrop/
 - [x] **CHANGELOG.md** — full version history on GitHub
 - [x] **Banner fixed** — no more garbled blocks on startup
 
-### v0.6 — Next
+### v0.6 — Done
+- [x] **Prompt format auto-detect** — chatml, llama3, gemma, phi3 per model; Gemma 2 and Llama 3 now work correctly
+- [x] **Config file** — `~/.llamdrop/config.json` overrides threads, context, batch, temperature, system prompt
+- [x] **⚙️ Config in main menu** — view all settings and their source (auto vs user-set)
+- [x] **Chat export** — `/export` saves conversation as markdown to Downloads
+- [x] **Battery monitoring** — 🔋 % drop shown per inference; warns if battery < 15% before session
+- [x] **Battery line in main menu header** — live battery % on Android devices
+
+### v0.7 — Next
 - [ ] Web-based model catalog (GitHub Pages) — browse models before installing
 - [ ] Community device profile submissions to models.json
 - [ ] Automated model testing pipeline before catalog addition
 - [ ] Arabic UI language support
-- [ ] Chat export to .txt file
+- [ ] llamdrop server mode — run model on phone, access from browser on same WiFi
 - [ ] Confirmed devices list per model in models.json
 
 ---
