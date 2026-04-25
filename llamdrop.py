@@ -11,7 +11,7 @@ import curses
 import json
 import time
 
-VERSION = "0.5.0"
+VERSION = "0.4.0"
 
 # Ensure modules directory is on path
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -522,7 +522,8 @@ def main():
                     v_info, 0
                 ))
                 input(f"\n  Press Enter to start chatting...")
-                run_chat(cmd, model_info["filename"], device_profile)
+                run_chat(cmd, model_info["filename"], device_profile,
+                         model_path=model_info["path"])
 
         # 1 — Browse & download (verified catalog)
         elif choice == 1:
@@ -584,7 +585,8 @@ def main():
                     v_info, 0
                 ))
                 input(f"\n  Press Enter to start chatting...")
-                run_chat(cmd, model_info["filename"], device_profile)
+                run_chat(cmd, model_info["filename"], device_profile,
+                         model_path=model_info["path"])
 
         # 4 — Resume session
         elif choice == 4:
@@ -615,7 +617,8 @@ def main():
                     if cmd:
                         input("  Press Enter to continue chatting...")
                         run_chat(cmd, model_name, device_profile,
-                                 initial_history=history)
+                                 initial_history=history,
+                                 model_path=model_path)
                     else:
                         print(c(RED, f"\n  Could not launch: {status}"))
                         input(f"\n  {t('press_enter_back')}")
