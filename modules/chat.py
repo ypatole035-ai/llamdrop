@@ -16,6 +16,12 @@ import sys
 import time
 import threading
 
+try:
+    from benchmarks import record_benchmark, parse_tps_from_output
+except ImportError:
+    def record_benchmark(*a, **k): pass
+    def parse_tps_from_output(t): return 0.0, 0.0
+
 SESSIONS_DIR = os.path.expanduser("~/.llamdrop/sessions")
 BIN_DIR      = os.path.expanduser("~/.llamdrop/bin")
 
@@ -206,7 +212,7 @@ class _InferenceRamWatcher:
 
 # ── Main chat loop ────────────────────────────────────────────────────────────
 
-def run_chat(cmd, model_name, device_profile,
+def run_chat(cmd, model_name, device_profile, model_path=None,
              initial_history=None, session_name=None):
     """
     Launch llama-cli and manage the conversation loop.
@@ -302,9 +308,15 @@ def run_chat(cmd, model_name, device_profile,
             indicator.stop()
             print("  🦙 ", end="", flush=True)
 
-            _launch_llama(cmd, prompt)
+            raw_out = _launch_llama(cmd, prompt)
 
             watcher.stop()
+
+            # Capture benchmark score from this inference
+            if raw_out and model_path:
+                gen_tps, prompt_tps = parse_tps_from_output(raw_out)
+                if gen_tps > 0:
+                    record_benchmark(model_path, gen_tps, prompt_tps)
 
             # ── Post-inference RAM check ──────────────────────────────────────
             if watcher.hit_critical:
@@ -461,6 +473,8 @@ def _launch_llama(cmd, prompt):
                 continue
             print(f"  {s}")
 
+        return raw_output  # Return full output for tps parsing
+
         t.join(timeout=2)
         print("")
     except KeyboardInterrupt:
@@ -516,4 +530,3 @@ def _handle_exit(history, model_name, session_name):
     except Exception:
         pass
     print("  Goodbye! 🦙")
-    
