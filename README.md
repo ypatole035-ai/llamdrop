@@ -115,6 +115,26 @@ All verified models are free, open-source, and downloadable without login or acc
 
 ---
 
+## Usage
+
+```bash
+llamdrop              # Launch UI
+llamdrop update       # Update to latest version
+llamdrop doctor       # Check install health
+llamdrop version      # Show version
+```
+
+**Chat commands:**
+```
+/help     — show commands
+/export   — save conversation
+/clear    — clear history
+/quit     — exit chat
+```
+
+---
+
+
 ## Supported Platforms
 
 llamdrop runs on any device that can run Python 3 in a Linux terminal.
