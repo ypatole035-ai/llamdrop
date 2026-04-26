@@ -167,102 +167,42 @@ def detect_platform():
     return "unknown"
 
 
-# ── Chip-aware big core counts ───────────────────────────────────────────────
-# Maps friendly chip name → number of big/performance cores.
-# llama.cpp runs best on big cores only — little cores add latency, not speed.
-_CHIP_BIG_CORES = {
-    # MediaTek Dimensity
-    "MediaTek Dimensity 720":   2,   # 2x A76 + 6x A55
-    "MediaTek Dimensity 700":   2,   # 2x A76 + 6x A55
-    "MediaTek Dimensity 900":   2,   # 2x A78 + 6x A55
-    "MediaTek Dimensity 1000+": 4,   # 4x A77 + 4x A55
-    "MediaTek Dimensity 1080":  2,   # 2x A78 + 6x A55
-    "MediaTek Dimensity 1100":  4,   # 4x A78 + 4x A55
-    "MediaTek Dimensity 1200":  4,   # 1x A78 prime + 3x A78 + 4x A55
-    "MediaTek Dimensity 8100":  4,   # 4x A78 + 4x A55
-    "MediaTek Dimensity 9000":  4,   # 1x X2 + 3x A710 + 4x A510
-    "MediaTek Dimensity 9200":  4,   # 1x X3 + 3x A715 + 4x A510
-    "MediaTek Dimensity 9200+": 4,
-    "MediaTek Dimensity 9300":  4,   # 4x X4 + 4x A720
-    # MediaTek Helio
-    "MediaTek Helio G85":       2,   # 2x A75 + 6x A55
-    "MediaTek Helio G90T":      2,   # 2x A76 + 6x A55
-    "MediaTek Helio G96":       2,   # 2x A76 + 6x A55
-    "MediaTek Helio P60":       4,   # 4x A73 + 4x A53
-    "MediaTek Helio P90":       2,   # 2x A75 + 6x A55
-    # Snapdragon
-    "Snapdragon 8 Gen 3":       4,   # 1x X4 + 5x A720 + 2x A520
-    "Snapdragon 8 Gen 2":       4,   # 1x X3 + 2x A715 + 2x A710 + 3x A510
-    "Snapdragon 8+ Gen 1":      4,   # 1x X2 + 3x A710 + 4x A510
-    "Snapdragon 8 Gen 1":       4,
-    "Snapdragon 888":           4,   # 1x X1 + 3x A78 + 4x A55
-    "Snapdragon 865":           4,   # 1x A77 prime + 3x A77 + 4x A55
-    "Snapdragon 7 Gen 1":       4,   # 1x A710 + 3x A710 + 4x A510
-    "Snapdragon 778G":          4,   # 1x A78 + 3x A78 + 4x A55
-    "Snapdragon 695":           2,   # 2x A77 + 6x A55
-    "Snapdragon 680":           4,   # 4x A73 + 4x A53
-    # Samsung Exynos
-    "Samsung Exynos 2400":      4,
-    "Samsung Exynos 2200":      4,   # 1x X2 + 3x A710 + 4x A510
-    "Samsung Exynos 1380":      4,   # 4x A78 + 4x A55
-    # HiSilicon Kirin
-    "HiSilicon Kirin 9000":     4,   # 1x A77 + 3x A77 + 4x A55
-    "HiSilicon Kirin 990":      4,   # 2x A76 + 2x A76 + 4x A55
-}
-
-
 def get_optimal_threads(cpu_info):
     """
-    Return the best thread count for llama.cpp on this device.
-
-    Uses chip-aware big core lookup first.
-    Falls back to cores//2 heuristic for unknown chips.
-    Little cores on ARM big.LITTLE actively slow inference — better to
-    use 2 fast cores than 8 mixed ones.
+    Calculate the best thread count for llama.cpp on this device.
+    On low-end phones, using ALL cores actually slows things down
+    because little cores drag down the big ones.
+    Strategy: use only big cores (usually half the total on ARM).
     """
-    cores     = cpu_info.get("cores", 1)
-    arch      = cpu_info.get("arch", "")
-    chip_name = cpu_info.get("chip", "")
+    cores = cpu_info.get("cores", 1)
+    arch  = cpu_info.get("arch", "")
 
-    # x86/x86_64 — no big.LITTLE, use all cores up to 8
-    if "x86" in arch:
-        return min(cores, 8)
-
-    # ARM — chip-aware lookup first
     if "aarch64" in arch or "arm" in arch.lower():
-        big_cores = _CHIP_BIG_CORES.get(chip_name)
-        if big_cores:
-            return max(1, min(big_cores, cores))
-        # Unknown chip — fallback heuristic
-        return max(1, min(4, cores // 2))
+        # ARM big.LITTLE: use half the cores (big cores only)
+        # minimum 1, maximum 4
+        optimal = max(1, min(4, cores // 2))
+    else:
+        # x86: use all cores up to 8
+        optimal = min(cores, 8)
 
-    return max(1, min(4, cores // 2))
+    return optimal
 
 
 def get_safe_context(ram_info):
     """
     Return a safe context window size based on available RAM.
     Larger context = more RAM used during inference.
-
-    RAM cost per 1K tokens ≈ 50MB for a 1.5B model, ~100MB for 3B.
-    Previous thresholds were too conservative — 512 is barely 2 exchanges.
-    Updated to give usable conversation depth at every RAM level.
-    Uses effective_avail_gb (RAM + zram) for a more accurate picture.
     """
-    avail = ram_info.get("effective_avail_gb", ram_info.get("available_gb", 0))
+    avail = ram_info.get("available_gb", 0)
 
-    if avail < 1.0:
-        return 512     # truly critical — keep minimal
-    elif avail < 1.5:
-        return 1024    # was 512 — 1K is viable for basic chat
-    elif avail < 2.0:
-        return 2048    # was 512 — 2K gives real multi-turn depth
+    if avail < 2.0:
+        return 512
     elif avail < 3.0:
-        return 2048    # was 1024
+        return 1024
     elif avail < 5.0:
-        return 4096    # was 2048
+        return 2048
     else:
-        return 8192    # high-RAM devices / desktop
+        return 4096
 
 
 def get_safe_batch_size(ram_info):
@@ -293,87 +233,6 @@ def _detect_ollama():
         return {"installed": False, "running": False}
 
 
-# ── Device class detection ───────────────────────────────────────────────────
-
-def get_device_class(ram_info, cpu_info, platform):
-    """
-    Classify this device into a tier that drives install and model decisions.
-      ultra_low  — <2GB effective RAM
-      low        — 2–4GB effective RAM
-      mid        — 4–8GB effective RAM
-      high       — 8–16GB RAM
-      desktop    — 16GB+ RAM or Linux non-ARM
-    """
-    avail = ram_info.get("effective_avail_gb", ram_info.get("available_gb", 0))
-    total = ram_info.get("total_gb", 0)
-    arch  = cpu_info.get("arch", "")
-
-    if platform in ("linux", "raspberry_pi") and "aarch64" not in arch:
-        if total >= 16:
-            return "desktop"
-        elif total >= 8:
-            return "high"
-        else:
-            return "mid"
-
-    if avail < 2.0:
-        return "ultra_low"
-    elif avail < 4.0:
-        return "low"
-    elif avail < 8.0:
-        return "mid"
-    elif avail < 16.0:
-        return "high"
-    else:
-        return "desktop"
-
-
-def get_tier_recommendation(device_class, ollama_info):
-    """
-    Given a device class, return recommended backend + model suggestions.
-    """
-    ollama_available = ollama_info.get("running", False)
-
-    if device_class == "ultra_low":
-        return {
-            "backend":          "llama.cpp",
-            "model_tier":       1,
-            "suggested_models": ["SmolLM2 1.7B", "Gemma 3 1B", "TinyLlama 1.1B"],
-            "install_note":     "Limited RAM — Tier 1 models only (under 2GB).",
-        }
-    elif device_class == "low":
-        return {
-            "backend":          "llama.cpp",
-            "model_tier":       2,
-            "suggested_models": ["Qwen2.5 3B", "Llama 3.2 3B", "Phi-4 Mini"],
-            "install_note":     "Good device — Tier 1–2 models recommended.",
-        }
-    elif device_class == "mid":
-        backend = "ollama" if ollama_available else "llama.cpp"
-        return {
-            "backend":          backend,
-            "model_tier":       2,
-            "suggested_models": ["Qwen3 4B", "Gemma 3 4B", "Llama 3.2 3B"],
-            "install_note":     f"Solid device. Using {backend}. Tier 2 models run well.",
-        }
-    elif device_class == "high":
-        backend = "ollama" if ollama_available else "llama.cpp"
-        return {
-            "backend":          backend,
-            "model_tier":       3,
-            "suggested_models": ["Mistral 7B", "DeepSeek R1 7B", "Qwen3 4B Q5"],
-            "install_note":     f"Powerful device. Using {backend}. Tier 3 available.",
-        }
-    else:  # desktop
-        backend = "ollama" if ollama_available else "llama.cpp"
-        return {
-            "backend":          backend,
-            "model_tier":       3,
-            "suggested_models": ["Mistral 7B", "DeepSeek R1 7B", "Llama 3.2 3B Q8"],
-            "install_note":     f"Desktop/server. Using {backend}. All models available.",
-        }
-
-
 def get_device_profile():
     """
     Master function. Returns a complete device profile dict.
@@ -385,9 +244,6 @@ def get_device_profile():
     plat    = detect_platform()
     ollama  = _detect_ollama()
 
-    device_class   = get_device_class(ram, cpu, plat)
-    recommendation = get_tier_recommendation(device_class, ollama)
-
     profile = {
         "platform":        plat,
         "ram":             ram,
@@ -397,8 +253,6 @@ def get_device_profile():
         "safe_context":    get_safe_context(ram),
         "safe_batch":      get_safe_batch_size(ram),
         "ollama":          ollama,
-        "device_class":    device_class,
-        "recommendation":  recommendation,
     }
 
     # Determine which model tier this device can handle
@@ -418,22 +272,21 @@ def get_device_profile():
 
 def format_profile_summary(profile):
     """Returns a human-readable one-line summary of device specs."""
-    ram          = profile["ram"]
-    cpu          = profile["cpu"]
-    avail        = ram.get("available_gb", 0)
-    total        = ram.get("total_gb", 0)
-    swap         = ram.get("swap_free_gb", 0)
-    cores        = cpu.get("cores", 1)
-    chip         = cpu.get("chip", "Unknown")
-    plat         = profile.get("platform", "unknown")
-    device_class = profile.get("device_class", "")
-    threads      = profile.get("optimal_threads", "?")
+    ram   = profile["ram"]
+    cpu   = profile["cpu"]
+    avail = ram.get("available_gb", 0)
+    total = ram.get("total_gb", 0)
+    swap  = ram.get("swap_free_gb", 0)
+    cores = cpu.get("cores", 1)
+    chip  = cpu.get("chip", "Unknown")
+    plat  = profile.get("platform", "unknown")
 
-    swap_str  = f" +{swap}GB swap" if swap > 0 else ""
-    class_str = f" · {device_class}" if device_class else ""
+    swap_str = f" +{swap}GB swap" if swap > 0 else ""
     return (
-        f"{chip} · {cores} cores ({threads} perf) · "
+        f"{chip} · {cores} cores · "
         f"{avail}GB free / {total}GB RAM{swap_str} · "
         f"{plat}{class_str}"
         )
     
+        f"{plat}"
+    )
