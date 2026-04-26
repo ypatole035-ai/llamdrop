@@ -84,9 +84,9 @@ def get_battery_line():
     if pct <= 15:
         icon = "🪫"
     elif pct <= 30:
-        icon = "🔋"
+        icon = "🔴"
     elif pct <= 60:
-        icon = "🔋"
+        icon = "🟡"
     else:
         icon = "🔋"
 
