@@ -1,5 +1,15 @@
 # llamdrop Changelog
 
+## v0.7.2 — 2026-04-27
+
+### Bug Fixes
+- **`browser.py` shipped with wrong content** — `browser.py` in the GitHub repo contained `benchmarks.py` content, causing an `ImportError: cannot import name 'show_browser'` crash on every launch after updating. Correct file restored.
+- **Retry path blocking read** — the fallback retry triggered on old llama-cli versions (unsupported flags) still used `proc2.stdout.read()`, freezing the spinner. Now uses the same daemon thread pattern as the main inference path.
+- **Mali Vulkan false positive** — `/dev/mali0` existing only proves Mali GPU hardware is present, not that a Vulkan driver is loaded. Detection now checks for a Vulkan ICD directory before claiming GPU acceleration available, matching the Adreno fix from v0.7.1.
+- **`/clear` didn't reset auto-save counter** — clearing conversation history reset `history` to `[]` but left `_last_save_len` at its old value, delaying the next auto-save by up to 10 messages. Counter now resets to `0` alongside history.
+
+---
+
 ## v0.7.1 — 2026-04-27
 
 ### Bug Fixes
