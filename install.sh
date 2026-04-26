@@ -5,7 +5,7 @@
 
 LLAMDROP_DIR="$HOME/.llamdrop"
 BIN_DIR="$LLAMDROP_DIR/bin"
-LLAMDROP_RAW="https://raw.githubusercontent.com/ypatole035-ai/llamdrop/main"
+LLAMDROP_RAW="https://raw.githubusercontent.com/ypatole035-ai/llamdrop/dev"
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
