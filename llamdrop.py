@@ -18,7 +18,7 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(SCRIPT_DIR, "modules"))
 
 from device      import get_device_profile, format_profile_summary
-from browser     import show_browser
+from browser     import show_browser, run_browser
 from downloader  import (download_model, get_downloaded_models,
                           get_all_gguf_files, model_is_downloaded,
                           smart_pick_variant)
@@ -266,7 +266,6 @@ def show_hf_search(device_profile):
     print(f"\n  Found {len(results)} compatible models. Opening browser...\n")
     time.sleep(1)
 
-    from browser import run_browser
     selected = curses.wrapper(run_browser, results, device_profile)
     return selected
 
@@ -718,25 +717,30 @@ def main():
         )
         version_notice = None
 
-        # Build current menu to know exact positions (Ollama item is dynamic)
-        _ollama_running = device_profile.get("ollama", {}).get("running", False)
-        # Fixed positions: 0=Chat, 1=Browse, 2=Search, 3=MyModels, 4=Resume
-        # If Ollama running: 5=Ollama, then 6=Device,7=Doctor,8=Config,9=Update,10=Lang,11=Help,12=Quit
-        # If Ollama NOT running:          5=Device, 6=Doctor,7=Config,8=Update, 9=Lang,10=Help,11=Quit
-        _offset = 1 if _ollama_running else 0
-        IDX_CHAT    = 0
-        IDX_BROWSE  = 1
-        IDX_SEARCH  = 2
-        IDX_MYMODELS= 3
-        IDX_RESUME  = 4
-        IDX_OLLAMA  = 5 if _ollama_running else -1
-        IDX_DEVICE  = 5 + _offset
-        IDX_DOCTOR  = 6 + _offset
-        IDX_CONFIG  = 7 + _offset
-        IDX_UPDATE  = 8 + _offset
-        IDX_LANG    = 9 + _offset
-        IDX_HELP    = 10 + _offset
-        IDX_QUIT    = 11 + _offset
+        # Bug #13 fix: derive menu indices by searching the actual menu item list
+        # by icon rather than using hardcoded offset arithmetic.  The old approach
+        # (IDX_DEVICE = 5 + _offset, etc.) silently breaks every time a menu item
+        # is inserted or removed.  Looking up by icon is order-independent.
+        _menu_items = get_menu_items(device_profile)
+        def _idx(icon, fallback=-1):
+            for i, (ic, _label, _desc) in enumerate(_menu_items):
+                if ic.strip() == icon.strip():
+                    return i
+            return fallback
+
+        IDX_CHAT     = _idx("🚀")
+        IDX_BROWSE   = _idx("⬇️")
+        IDX_SEARCH   = _idx("🔎")
+        IDX_MYMODELS = _idx("📂")
+        IDX_RESUME   = _idx("💾")
+        IDX_OLLAMA   = _idx("🤖")
+        IDX_DEVICE   = _idx("🔧")
+        IDX_DOCTOR   = _idx("🩺")
+        IDX_CONFIG   = _idx("⚙️")
+        IDX_UPDATE   = _idx("🆙")
+        IDX_LANG     = _idx("🌐")
+        IDX_HELP     = _idx("❓")
+        IDX_QUIT     = _idx("✕")
 
         # 0 — Start chatting
         if choice == IDX_CHAT:
