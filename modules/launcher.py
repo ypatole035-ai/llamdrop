@@ -63,12 +63,33 @@ def detect_vulkan():
 
     Returns dict: {available: bool, gpu_type: str, note: str}
     """
-    # Check Qualcomm Adreno
+    # Check Qualcomm Adreno — /dev/kgsl-3d0 means the GPU hardware is present,
+    # but NOT that a Vulkan driver is loaded.  Bug #7 fix: confirm Vulkan is
+    # actually usable by also checking for a Vulkan ICD or vulkaninfo.
     if os.path.exists("/dev/kgsl-3d0"):
+        # Look for Adreno Vulkan ICD (Termux / LineageOS typical paths)
+        adreno_icd_hints = [
+            "/vendor/etc/vulkan/icd.d",
+            "/system/etc/vulkan/icd.d",
+            "/data/data/com.termux/files/usr/share/vulkan/icd.d",
+        ]
+        icd_found = any(
+            os.path.isdir(d) and os.listdir(d)
+            for d in adreno_icd_hints
+            if os.path.isdir(d)
+        )
+        if icd_found:
+            return {
+                "available": True,
+                "gpu_type":  "Adreno (Qualcomm)",
+                "note":      "Vulkan via Adreno GPU",
+            }
+        # Hardware present but no ICD confirmed — report as unavailable
+        # rather than injecting --gpu-layers and crashing.
         return {
-            "available": True,
-            "gpu_type":  "Adreno (Qualcomm)",
-            "note":      "Vulkan via Adreno GPU",
+            "available": False,
+            "gpu_type":  "Adreno (Qualcomm) — no Vulkan ICD found",
+            "note":      "GPU hardware detected but Vulkan driver not confirmed",
         }
 
     # Check ARM Mali
