@@ -105,7 +105,11 @@ def format_score(model_filename):
 def parse_tps_from_output(output_text):
     """
     Parse tokens/second values from llama-cli output.
-    Looks for lines like: [ Prompt: 129.7 t/s | Generation: 71.5 t/s ]
+
+    Handles two output formats:
+      Old: [ Prompt: 129.7 t/s | Generation: 71.5 t/s ]
+      New: llama_print_timings:  eval time = ... ms / 42 runs ( X ms per token,  71.5 tokens per second)
+           llama_print_timings: prompt eval time = ... ( X ms per token, 129.7 tokens per second)
 
     Returns (gen_tps, prompt_tps) — both floats, 0.0 if not found.
     """
@@ -113,12 +117,13 @@ def parse_tps_from_output(output_text):
     gen_tps    = 0.0
     prompt_tps = 0.0
 
-    # Match: [ Prompt: 129.7 t/s | Generation: 71.5 t/s ]
+    # --- Old format: [ Prompt: 129.7 t/s | Generation: 71.5 t/s ] ---
     gen_match = re.search(
         r'Generation[:\s]+([0-9]+\.?[0-9]*)\s*t/s', output_text, re.IGNORECASE
     )
+    # Use negative lookbehind to avoid matching "prompt eval" lines
     prompt_match = re.search(
-        r'Prompt[:\s]+([0-9]+\.?[0-9]*)\s*t/s', output_text, re.IGNORECASE
+        r'(?<!\w)Prompt[:\s]+([0-9]+\.?[0-9]*)\s*t/s', output_text, re.IGNORECASE
     )
 
     if gen_match:
@@ -132,5 +137,30 @@ def parse_tps_from_output(output_text):
             prompt_tps = float(prompt_match.group(1))
         except ValueError:
             pass
+
+    # --- New format: llama_print_timings lines with "tokens per second" ---
+    # Only use if old format produced nothing (avoids double-counting)
+    if gen_tps == 0.0:
+        # "eval time" (not "prompt eval time") = generation speed
+        new_gen = re.search(
+            r'llama_print_timings:\s+eval time\b.*?([0-9]+\.?[0-9]*)\s+tokens per second',
+            output_text, re.IGNORECASE
+        )
+        if new_gen:
+            try:
+                gen_tps = float(new_gen.group(1))
+            except ValueError:
+                pass
+
+    if prompt_tps == 0.0:
+        new_prompt = re.search(
+            r'llama_print_timings:\s+prompt eval time\b.*?([0-9]+\.?[0-9]*)\s+tokens per second',
+            output_text, re.IGNORECASE
+        )
+        if new_prompt:
+            try:
+                prompt_tps = float(new_prompt.group(1))
+            except ValueError:
+                pass
 
     return gen_tps, prompt_tps
