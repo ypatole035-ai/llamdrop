@@ -179,25 +179,39 @@ get_llama_binary() {
   # Bug #18 fix: verify SHA256 of downloaded tarball before extracting.
   # Fetch the checksum sidecar file GitHub Releases publishes alongside each asset.
   # If verification fails, abort rather than extract a potentially corrupted binary.
+  #
+  # Bug fix: GitHub returns an HTML "Not Found" page (not a real hash) when the
+  # .sha256 sidecar doesn't exist for a given release. We now validate that the
+  # fetched content is a 64-character hex string before treating it as a hash —
+  # this prevents an HTML error page from being mistaken for the expected checksum.
   LLAMA_SHA_URL="${LLAMA_BIN_URL}.sha256"
   LLAMA_SHA_FILE="${LLAMA_TAR}.sha256"
   info "Verifying checksum..."
   curl -sL --retry 2 "$LLAMA_SHA_URL" -o "$LLAMA_SHA_FILE" 2>/dev/null
   if [ -s "$LLAMA_SHA_FILE" ]; then
-    # sha256sum format: "<hash>  <filename>" — replace the filename with our local path
-    EXPECTED_HASH=$(cat "$LLAMA_SHA_FILE" | awk '{print $1}')
-    ACTUAL_HASH=$(sha256sum "$LLAMA_TAR" 2>/dev/null | awk '{print $1}')
-    if [ -n "$EXPECTED_HASH" ] && [ -n "$ACTUAL_HASH" ]; then
-      if [ "$EXPECTED_HASH" != "$ACTUAL_HASH" ]; then
-        error "SHA256 mismatch — download may be corrupted or tampered with."
-        error "Expected: $EXPECTED_HASH"
-        error "Got     : $ACTUAL_HASH"
-        rm -f "$LLAMA_TAR" "$LLAMA_SHA_FILE"
-        exit 1
+    # sha256sum format: "<hash>  <filename>" — extract first field (the hash)
+    EXPECTED_HASH=$(awk '{print $1}' "$LLAMA_SHA_FILE")
+    # Validate it actually looks like a SHA256 hex digest (exactly 64 hex chars).
+    # If the sidecar doesn't exist, GitHub serves an HTML "Not Found" page whose
+    # first token ("Not") would otherwise be used as the expected hash, causing a
+    # false mismatch on every valid download.
+    if echo "$EXPECTED_HASH" | grep -qE '^[0-9a-fA-F]{64}$'; then
+      ACTUAL_HASH=$(sha256sum "$LLAMA_TAR" 2>/dev/null | awk '{print $1}')
+      if [ -n "$ACTUAL_HASH" ]; then
+        if [ "$EXPECTED_HASH" != "$ACTUAL_HASH" ]; then
+          error "SHA256 mismatch — download may be corrupted or tampered with."
+          error "Expected: $EXPECTED_HASH"
+          error "Got     : $ACTUAL_HASH"
+          rm -f "$LLAMA_TAR" "$LLAMA_SHA_FILE"
+          exit 1
+        fi
+        info "Checksum OK."
+      else
+        warn "Could not compute local hash — skipping verification."
       fi
-      info "Checksum OK."
     else
-      warn "Could not parse checksum — skipping verification."
+      # Sidecar content is not a valid hash (e.g. HTML error page) — skip quietly
+      warn "Checksum file not available for this release — skipping verification."
     fi
     rm -f "$LLAMA_SHA_FILE"
   else
