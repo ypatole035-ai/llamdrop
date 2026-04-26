@@ -44,17 +44,32 @@ DEFAULT_SYSTEM_PROMPT = (
 )
 
 _config_cache = None
+_config_mtime = None   # Bug #8 fix: track file mtime to detect external edits
 
 
 def load_config(force=False):
     """
     Load config from ~/.llamdrop/config.json.
     Returns a dict with all keys — missing keys use defaults.
-    Caches after first load unless force=True.
+
+    Caches after first load.  Cache is automatically invalidated when:
+    - force=True is passed (e.g. after save_config())
+    - the file's mtime has changed since last load (external editor support)
     """
-    global _config_cache
+    global _config_cache, _config_mtime
+
+    # Check if the file has been modified since we last read it
+    current_mtime = None
+    if os.path.exists(CONFIG_FILE):
+        try:
+            current_mtime = os.path.getmtime(CONFIG_FILE)
+        except Exception:
+            pass
+
     if _config_cache is not None and not force:
-        return _config_cache
+        if current_mtime == _config_mtime:
+            return _config_cache
+        # mtime changed — file was edited externally, fall through to reload
 
     user_config = {}
     if os.path.exists(CONFIG_FILE):
@@ -87,6 +102,7 @@ def load_config(force=False):
         config[key] = val
 
     _config_cache = config
+    _config_mtime = current_mtime
     return config
 
 
@@ -100,7 +116,7 @@ def save_config(updates):
     Save updated config values to config.json.
     Merges with existing config — only updates specified keys.
     """
-    global _config_cache
+    global _config_cache, _config_mtime
 
     existing = {}
     if os.path.exists(CONFIG_FILE):
@@ -117,6 +133,7 @@ def save_config(updates):
         json.dump(existing, f, indent=2)
 
     _config_cache = None  # invalidate cache
+    _config_mtime = None
 
 
 def create_default_config():
