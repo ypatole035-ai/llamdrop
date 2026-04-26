@@ -293,6 +293,15 @@ def run_self_update(current_version, verbose=True):
 
     p(f"\n  Downloading updates...")
 
+    # Bug #6 fix: resolve the actual install directory from this file's location
+    # rather than always writing to ~/.llamdrop/.  If llamdrop is installed
+    # somewhere else (e.g. /usr/local/lib/llamdrop or a custom prefix),
+    # hardcoding ~/.llamdrop/ silently updates the wrong tree and reports
+    # "✓ Updated" while the running binary is unchanged.
+    _this_file   = os.path.abspath(__file__)           # .../modules/updater.py
+    _modules_dir = os.path.dirname(_this_file)          # .../modules/
+    _install_dir = os.path.dirname(_modules_dir)        # actual install root
+
     # Step 5: Pull and write each file
     success_count = 0
     fail_count    = 0
@@ -300,7 +309,7 @@ def run_self_update(current_version, verbose=True):
 
     for local_rel, github_rel in UPDATE_FILES.items():
         url       = f"{GITHUB_RAW}/{github_rel}"
-        local_abs = os.path.join(LLAMDROP_DIR, local_rel)
+        local_abs = os.path.join(_install_dir, local_rel)
 
         # Safety check — never overwrite protected paths
         is_protected = any(
