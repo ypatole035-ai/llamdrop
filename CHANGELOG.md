@@ -1,5 +1,26 @@
 # llamdrop Changelog
 
+## v0.7.1 — 2026-04-27
+
+### Bug Fixes
+- **Resume download corruption** — urllib backend now detects when a server returns `200` instead of `206` on a range request and restarts cleanly rather than appending the full file onto a partial download.
+- **Storage check fallback** — default storage estimate when HEAD request fails raised from 1 GB to 4 GB, preventing false-pass on nearly-full devices.
+- **Auto-save skips after trim** — replaced `len(history) % 10 == 0` check with a `_last_save_len` counter so context trims can no longer cause the auto-save to silently skip indefinitely.
+- **Blocking stdout read** — `proc.stdout.read()` replaced with a daemon thread doing line-by-line collection, releasing the GIL between reads so the 🦙 Thinking spinner actually animates.
+- **Gemma response truncation** — `_extract_response()` now uses `str.partition()` instead of `str.split()[-1]`, so a model emitting `<start_of_turn>model` inside its own response no longer gets the tail silently cut off.
+- **TPS regex for newer llama-cli** — `parse_tps_from_output()` now handles both the old `[ Generation: X t/s ]` format and the newer `llama_print_timings: eval time` format so benchmarks record correctly on recent builds.
+- **Vulkan false positive** — `/dev/kgsl-3d0` existing only proves Adreno hardware is present, not that a Vulkan driver is loaded. Detection now also checks for a Vulkan ICD directory before claiming GPU acceleration is available.
+- **Self-update writes to wrong directory** — `run_self_update()` now resolves the install root from `__file__` rather than always writing to `~/.llamdrop/`, so custom-prefix installs update the correct tree.
+- **Stale config cache** — `load_config()` now tracks the config file's mtime and automatically invalidates the cache when the file is edited externally (e.g. in a text editor from another terminal).
+- **Runtime browser import** — `from browser import run_browser` moved from inside `show_hf_search()` to the top-level import block, preventing a silent `ImportError` if the module is renamed.
+- **Menu index offset arithmetic** — hardcoded `IDX_DEVICE = 5 + _offset` style indices replaced with an icon-based `_idx()` lookup against the live `get_menu_items()` list, so adding or removing a menu item no longer shifts every handler below it.
+- **RAM estimate too optimistic** — `_estimate_ram_from_size_gb()` overhead raised from `1.25×` to `1.4×` to account for KV cache growth at larger context sizes, reducing false-pass on tight-RAM devices.
+- **Battery icons** — `get_battery_line()` now returns distinct icons per charge range (`🪫` ≤15%, `🔴` ≤30%, `🟡` ≤60%, `🔋` >60%) instead of mapping all ranges above 15% to the same `🔋`.
+- **Silent missing translations** — `i18n.py` now calls `check_missing_translations()` at startup and prints a warning to stderr for any non-English language that is missing keys present in English.
+- **No checksum on binary download** — `install.sh` now fetches the `.sha256` sidecar file from GitHub Releases and verifies `sha256sum` before extracting the llama-cli tarball, aborting on mismatch.
+
+---
+
 ## v0.7.0 — 2026-04-27
 
 ### New Features
