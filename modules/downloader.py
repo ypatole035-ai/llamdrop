@@ -270,7 +270,10 @@ def download_model(model, device_profile, on_progress=None):
     try:
         stat       = os.statvfs(dest_dir)
         free_bytes = stat.f_bavail * stat.f_frsize
-        needed     = remote_size if remote_size > 0 else variant.get("download_size_gb", 1) * 1024**3
+        # Bug #10 fix: if HEAD failed (remote_size == 0) AND download_size_gb is
+        # missing from the variant entry, default to 4 GB rather than 1 GB so the
+        # storage check is conservative instead of falsely passing on small devices.
+        needed     = remote_size if remote_size > 0 else variant.get("download_size_gb", 4) * 1024**3
         if free_bytes < needed * 1.1:
             return False, "", (
                 f"Not enough storage. Need ~{format_size(int(needed))}, "
@@ -352,7 +355,17 @@ def _download_with_urllib(url, dest_path, resume_from=0, total_size=0):
         req  = urllib.request.Request(url, headers=headers)
         resp = urllib.request.urlopen(req, timeout=30)
 
-        downloaded  = resume_from
+        # Bug #2 fix: if we requested a resume (Range header) but the server
+        # returned 200 instead of 206, it's sending the full file from byte 0.
+        # Appending it onto the partial file would corrupt the download.
+        # Detect this and fall back to a clean overwrite.
+        if resume_from > 0 and resp.status == 200:
+            mode = "wb"
+            downloaded = 0
+            print("  ⚠ Server doesn't support resume (200 OK) — restarting download.")
+        else:
+            downloaded = resume_from
+
         chunk_size  = 65536
         start_time  = time.time()
         last_update = start_time
@@ -384,4 +397,5 @@ def _download_with_urllib(url, dest_path, resume_from=0, total_size=0):
         return False, f"Network error: {e}"
     except Exception as e:
         return False, str(e)
-    
+
+  
