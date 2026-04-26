@@ -42,11 +42,15 @@ def _estimate_params_from_name(repo_id):
 def _estimate_ram_from_size_gb(size_gb, quant_key):
     """
     Estimate minimum RAM needed based on file size and quantization.
-    Rule of thumb: RAM needed ≈ file_size * 1.2 (overhead for KV cache etc.)
+
+    Bug #15 fix: 1.25x overhead is too optimistic for models with a large
+    context window — KV cache alone can add 0.5–1 GB at 4096+ tokens.
+    Using 1.4x gives a more conservative (safer) estimate so models near
+    the RAM limit don't silently pass the filter and OOM during inference.
     """
     if size_gb <= 0:
         return None
-    overhead = 1.25
+    overhead = 1.4
     return round(size_gb * overhead, 1)
 
 
