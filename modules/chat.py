@@ -307,7 +307,8 @@ def run_chat(cmd, model_name, device_profile, model_path=None, prompt_format='ch
     if not session_name:
         session_name = f"session_{time.strftime('%Y%m%d_%H%M%S')}"
 
-    watcher   = _InferenceRamWatcher()
+    watcher        = _InferenceRamWatcher()
+    _last_save_len = 0   # Bug #5 fix: track length at last save, not % 10
     indicator = ThinkingIndicator()
 
     try:
@@ -428,9 +429,11 @@ def run_chat(cmd, model_name, device_profile, model_path=None, prompt_format='ch
             else:
                 history.append({"role": "assistant", "content": assistant_content})
 
-            # Auto-save every 5 exchanges
-            if len(history) % 10 == 0:
+            # Auto-save every 10 messages — compare against last saved length
+            # rather than % 10 so trims can't cause the counter to skip a save.
+            if len(history) - _last_save_len >= 10:
                 save_session(session_name, model_name, history)
+                _last_save_len = len(history)
 
             # Release memory back to OS immediately after each response
             _clean_memory()
@@ -564,17 +567,23 @@ def _extract_response(raw_output):
     Extract and clean the model's response from raw llama-cli stdout.
 
     llama-cli echoes the full prompt then generates the response.
-    We find the last assistant marker and take everything after it,
+    We find the last prompt-echo marker and take everything after it,
     then strip noise lines.
+
+    Bug #14 fix: use str.partition() on the FIRST marker match instead of
+    split()[-1].  split(marker)[-1] cuts on every occurrence of the marker
+    string in the output — if a Gemma model happens to emit "<start_of_turn>model"
+    inside its own response the tail gets silently truncated.  partition() only
+    splits on the first hit, which is always the prompt-echo, so generated text
+    that contains the same string is preserved.
 
     Returns clean_response string.
     """
+    response_text = raw_output
     for marker in _PROMPT_MARKERS:
         if marker in raw_output:
-            response_text = raw_output.split(marker)[-1]
+            _, _sep, response_text = raw_output.partition(marker)
             break
-    else:
-        response_text = raw_output
 
     lines = []
     for line in response_text.splitlines():
@@ -671,9 +680,25 @@ def _run_inference(cmd, prompt, max_tokens=300, temperature=0.7):
         t = threading.Thread(target=_collect_stderr, daemon=True)
         t.start()
 
-        raw_output = proc.stdout.read()
+        # Bug #9 fix: proc.stdout.read() blocks until the process exits,
+        # which means the ThinkingIndicator spinner in the caller's thread
+        # is frozen solid — the spinner thread can't run because this thread
+        # owns the GIL while waiting on I/O.  Collect stdout line-by-line in
+        # a daemon thread instead, so the GIL is released between reads and
+        # the spinner can actually animate.
+        stdout_lines = []
+
+        def _collect_stdout():
+            for line in proc.stdout:
+                stdout_lines.append(line)
+
+        t_out = threading.Thread(target=_collect_stdout, daemon=True)
+        t_out.start()
+        t_out.join()          # wait for stdout to close (process done)
         proc.wait()
         t.join(timeout=2)
+
+        raw_output = "".join(stdout_lines)
 
         clean_response = _extract_response(raw_output)
 
