@@ -92,13 +92,30 @@ def detect_vulkan():
             "note":      "GPU hardware detected but Vulkan driver not confirmed",
         }
 
-    # Check ARM Mali
+    # Check ARM Mali — same caveat as Adreno: /dev/mali0 proves hardware exists,
+    # not that a Vulkan driver is loaded.  Validate with ICD dirs first.
     for mali_path in ["/dev/mali0", "/dev/mali", "/proc/driver/mali"]:
         if os.path.exists(mali_path):
+            mali_icd_hints = [
+                "/vendor/etc/vulkan/icd.d",
+                "/system/etc/vulkan/icd.d",
+                "/data/data/com.termux/files/usr/share/vulkan/icd.d",
+            ]
+            icd_found = any(
+                os.path.isdir(d) and os.listdir(d)
+                for d in mali_icd_hints
+                if os.path.isdir(d)
+            )
+            if icd_found:
+                return {
+                    "available": True,
+                    "gpu_type":  "Mali (ARM)",
+                    "note":      "Vulkan via Mali GPU",
+                }
             return {
-                "available": True,
-                "gpu_type":  "Mali (ARM)",
-                "note":      "Vulkan via Mali GPU",
+                "available": False,
+                "gpu_type":  "Mali (ARM) — no Vulkan ICD found",
+                "note":      "GPU hardware detected but Vulkan driver not confirmed",
             }
 
     # Check for Vulkan ICD loader (desktop Linux / some Android)
