@@ -1,0 +1,861 @@
+{
+  "version": "0.8",
+  "last_updated": "2026-04-26",
+  "tiers": {
+    "1": {
+      "name": "Tier 1 \u2014 Starter (under 2GB RAM)",
+      "min_ram": 0,
+      "max_ram": 2.0
+    },
+    "2": {
+      "name": "Tier 2 \u2014 Standard (2\u20134GB RAM)",
+      "min_ram": 2.0,
+      "max_ram": 4.0
+    },
+    "3": {
+      "name": "Tier 3 \u2014 Capable (4GB+ RAM)",
+      "min_ram": 4.0,
+      "max_ram": 99
+    }
+  },
+  "models": [
+    {
+      "id": "smollm2-135m",
+      "name": "SmolLM2 135M",
+      "tier": 1,
+      "hf_repo": "bartowski/SmolLM2-135M-Instruct-GGUF",
+      "best_for": "Ultra-fast responses, simple questions",
+      "languages": [
+        "english"
+      ],
+      "license": "Apache 2.0",
+      "note": "Tiniest model. Extremely fast. Very limited reasoning.",
+      "verified": true,
+      "variants": {
+        "Q4_K_M": {
+          "filename": "SmolLM2-135M-Instruct-Q4_K_M.gguf",
+          "download_size_gb": 0.1,
+          "min_ram_gb": 0.5
+        }
+      },
+      "prompt_format": "chatml",
+      "categories": [
+        "fast",
+        "chat"
+      ]
+    },
+    {
+      "id": "smollm2-360m",
+      "name": "SmolLM2 360M",
+      "tier": 1,
+      "hf_repo": "bartowski/SmolLM2-360M-Instruct-GGUF",
+      "best_for": "Basic chat, simple questions",
+      "languages": [
+        "english"
+      ],
+      "license": "Apache 2.0",
+      "note": "Small but noticeably smarter than 135M.",
+      "verified": true,
+      "variants": {
+        "Q4_K_M": {
+          "filename": "SmolLM2-360M-Instruct-Q4_K_M.gguf",
+          "download_size_gb": 0.25,
+          "min_ram_gb": 0.8
+        }
+      },
+      "prompt_format": "chatml",
+      "categories": [
+        "fast",
+        "chat"
+      ]
+    },
+    {
+      "id": "qwen2.5-0.5b",
+      "name": "Qwen2.5 0.5B",
+      "tier": 1,
+      "hf_repo": "Qwen/Qwen2.5-0.5B-Instruct-GGUF",
+      "best_for": "Chat, basic reasoning, fast responses",
+      "languages": [
+        "english",
+        "chinese"
+      ],
+      "license": "Apache 2.0",
+      "note": "Best Tier 1 model. Surprisingly good for its size.",
+      "verified": true,
+      "variants": {
+        "Q4_K_M": {
+          "filename": "qwen2.5-0.5b-instruct-q4_k_m.gguf",
+          "download_size_gb": 0.4,
+          "min_ram_gb": 1.0
+        },
+        "Q2_K": {
+          "filename": "qwen2.5-0.5b-instruct-q2_k.gguf",
+          "download_size_gb": 0.3,
+          "min_ram_gb": 0.8
+        }
+      },
+      "prompt_format": "chatml",
+      "categories": [
+        "chat",
+        "fast"
+      ]
+    },
+    {
+      "id": "tinyllama-1.1b",
+      "name": "TinyLlama 1.1B",
+      "tier": 1,
+      "hf_repo": "TheBloke/TinyLlama-1.1B-Chat-v1.0-GGUF",
+      "best_for": "Lightweight chat, fast replies",
+      "languages": [
+        "english"
+      ],
+      "license": "Apache 2.0",
+      "note": "Classic tiny model. Stable and fast on very low RAM.",
+      "verified": true,
+      "variants": {
+        "Q4_K_M": {
+          "filename": "tinyllama-1.1b-chat-v1.0.Q4_K_M.gguf",
+          "download_size_gb": 0.67,
+          "min_ram_gb": 1.2
+        },
+        "Q2_K": {
+          "filename": "tinyllama-1.1b-chat-v1.0.Q2_K.gguf",
+          "download_size_gb": 0.45,
+          "min_ram_gb": 0.9
+        }
+      },
+      "prompt_format": "chatml",
+      "categories": [
+        "fast",
+        "chat"
+      ]
+    },
+    {
+      "id": "smollm2-1.7b",
+      "name": "SmolLM2 1.7B",
+      "tier": 1,
+      "hf_repo": "bartowski/SmolLM2-1.7B-Instruct-GGUF",
+      "best_for": "Chat, summarization, instruction following",
+      "languages": [
+        "english"
+      ],
+      "license": "Apache 2.0",
+      "note": "HuggingFace's best small model. Excellent quality for size.",
+      "verified": true,
+      "variants": {
+        "Q4_K_M": {
+          "filename": "SmolLM2-1.7B-Instruct-Q4_K_M.gguf",
+          "download_size_gb": 1.1,
+          "min_ram_gb": 1.8
+        },
+        "Q2_K": {
+          "filename": "SmolLM2-1.7B-Instruct-Q2_K.gguf",
+          "download_size_gb": 0.7,
+          "min_ram_gb": 1.3
+        }
+      },
+      "prompt_format": "chatml",
+      "categories": [
+        "chat",
+        "fast"
+      ]
+    },
+    {
+      "id": "qwen2.5-1.5b",
+      "name": "Qwen2.5 1.5B",
+      "tier": 2,
+      "hf_repo": "Qwen/Qwen2.5-1.5B-Instruct-GGUF",
+      "best_for": "General chat, coding help, reasoning",
+      "languages": [
+        "english",
+        "chinese"
+      ],
+      "license": "Apache 2.0",
+      "note": "Great balance of speed and intelligence.",
+      "verified": true,
+      "variants": {
+        "Q4_K_M": {
+          "filename": "qwen2.5-1.5b-instruct-q4_k_m.gguf",
+          "download_size_gb": 1.0,
+          "min_ram_gb": 2.0
+        },
+        "Q2_K": {
+          "filename": "qwen2.5-1.5b-instruct-q2_k.gguf",
+          "download_size_gb": 0.6,
+          "min_ram_gb": 1.5
+        }
+      },
+      "prompt_format": "chatml",
+      "categories": [
+        "chat",
+        "coding"
+      ]
+    },
+    {
+      "id": "qwen2.5-coder-1.5b",
+      "name": "Qwen2.5 Coder 1.5B",
+      "tier": 2,
+      "hf_repo": "Qwen/Qwen2.5-Coder-1.5B-Instruct-GGUF",
+      "best_for": "Writing and explaining code",
+      "languages": [
+        "english",
+        "chinese"
+      ],
+      "license": "Apache 2.0",
+      "note": "Specialized for coding. Best small coding model.",
+      "verified": true,
+      "variants": {
+        "Q4_K_M": {
+          "filename": "qwen2.5-coder-1.5b-instruct-q4_k_m.gguf",
+          "download_size_gb": 1.0,
+          "min_ram_gb": 2.0
+        }
+      },
+      "prompt_format": "chatml",
+      "categories": [
+        "coding"
+      ]
+    },
+    {
+      "id": "llama3.2-1b",
+      "name": "Llama 3.2 1B",
+      "tier": 2,
+      "hf_repo": "bartowski/Llama-3.2-1B-Instruct-GGUF",
+      "best_for": "General chat, instruction following",
+      "languages": [
+        "english"
+      ],
+      "license": "Llama 3.2 Community",
+      "note": "Fast and stable. Good for everyday use.",
+      "verified": true,
+      "variants": {
+        "Q4_K_M": {
+          "filename": "Llama-3.2-1B-Instruct-Q4_K_M.gguf",
+          "download_size_gb": 0.8,
+          "min_ram_gb": 1.6
+        },
+        "IQ3_M": {
+          "filename": "Llama-3.2-1B-Instruct-IQ3_M.gguf",
+          "download_size_gb": 0.6,
+          "min_ram_gb": 1.0,
+          "note": "CPU only \u2014 no Vulkan."
+        }
+      },
+      "prompt_format": "llama3",
+      "categories": [
+        "chat"
+      ]
+    },
+    {
+      "id": "deepseek-r1-1.5b",
+      "name": "DeepSeek R1 Distill 1.5B",
+      "tier": 2,
+      "hf_repo": "bartowski/DeepSeek-R1-Distill-Qwen-1.5B-GGUF",
+      "best_for": "Step-by-step reasoning, math, logic",
+      "languages": [
+        "english",
+        "chinese"
+      ],
+      "license": "MIT",
+      "note": "Reasoning model \u2014 shows thinking steps. Great for problem solving.",
+      "verified": true,
+      "variants": {
+        "Q4_K_M": {
+          "filename": "DeepSeek-R1-Distill-Qwen-1.5B-Q4_K_M.gguf",
+          "download_size_gb": 1.0,
+          "min_ram_gb": 2.0
+        }
+      },
+      "prompt_format": "chatml",
+      "categories": [
+        "reasoning",
+        "math"
+      ]
+    },
+    {
+      "id": "gemma2-2b",
+      "name": "Gemma 2 2B",
+      "tier": 2,
+      "hf_repo": "bartowski/gemma-2-2b-it-GGUF",
+      "best_for": "Reasoning, summarization, chat",
+      "languages": [
+        "english"
+      ],
+      "license": "Gemma Terms",
+      "note": "Google's efficient small model. Very capable.",
+      "verified": true,
+      "variants": {
+        "Q4_K_M": {
+          "filename": "gemma-2-2b-it-Q4_K_M.gguf",
+          "download_size_gb": 1.6,
+          "min_ram_gb": 3.0
+        },
+        "Q2_K": {
+          "filename": "gemma-2-2b-it-Q2_K.gguf",
+          "download_size_gb": 1.0,
+          "min_ram_gb": 2.2
+        }
+      },
+      "prompt_format": "gemma",
+      "categories": [
+        "chat",
+        "reasoning"
+      ]
+    },
+    {
+      "id": "phi3-mini",
+      "name": "Phi-3 Mini 3.8B",
+      "tier": 2,
+      "hf_repo": "bartowski/Phi-3-mini-4k-instruct-GGUF",
+      "best_for": "Reasoning, coding, math, chat",
+      "languages": [
+        "english"
+      ],
+      "license": "MIT",
+      "note": "Microsoft's compact powerhouse. Excellent reasoning for its size.",
+      "verified": true,
+      "variants": {
+        "Q4_K_M": {
+          "filename": "Phi-3-mini-4k-instruct-Q4_K_M.gguf",
+          "download_size_gb": 2.2,
+          "min_ram_gb": 3.5
+        },
+        "Q2_K": {
+          "filename": "Phi-3-mini-4k-instruct-Q2_K.gguf",
+          "download_size_gb": 1.5,
+          "min_ram_gb": 2.5
+        }
+      },
+      "prompt_format": "phi3",
+      "categories": [
+        "reasoning",
+        "coding",
+        "math"
+      ]
+    },
+    {
+      "id": "aya-expanse-8b",
+      "name": "Aya Expanse 8B",
+      "tier": 2,
+      "hf_repo": "bartowski/aya-expanse-8b-GGUF",
+      "best_for": "Multilingual chat \u2014 Hindi, Marathi, Arabic, 100+ languages",
+      "languages": [
+        "multilingual",
+        "hindi",
+        "marathi",
+        "arabic",
+        "english"
+      ],
+      "license": "CC-BY-NC",
+      "note": "Best multilingual model for Indian languages. Cohere's open model.",
+      "verified": false,
+      "variants": {
+        "Q2_K": {
+          "filename": "aya-expanse-8b-Q2_K.gguf",
+          "download_size_gb": 3.1,
+          "min_ram_gb": 3.8
+        }
+      },
+      "prompt_format": "chatml",
+      "categories": [
+        "multilingual",
+        "chat"
+      ]
+    },
+    {
+      "id": "mistral-7b",
+      "name": "Mistral 7B v0.3",
+      "tier": 3,
+      "hf_repo": "bartowski/Mistral-7B-Instruct-v0.3-GGUF",
+      "best_for": "High quality responses, writing, analysis",
+      "languages": [
+        "english"
+      ],
+      "license": "Apache 2.0",
+      "note": "Needs 5GB+ RAM. Best quality on capable devices.",
+      "verified": true,
+      "variants": {
+        "Q4_K_M": {
+          "filename": "Mistral-7B-Instruct-v0.3-Q4_K_M.gguf",
+          "download_size_gb": 4.1,
+          "min_ram_gb": 5.5
+        },
+        "Q2_K": {
+          "filename": "Mistral-7B-Instruct-v0.3-Q2_K.gguf",
+          "download_size_gb": 2.7,
+          "min_ram_gb": 4.5
+        },
+        "IQ3_M": {
+          "filename": "Mistral-7B-Instruct-v0.3-IQ3_M.gguf",
+          "download_size_gb": 3.8,
+          "min_ram_gb": 4.6,
+          "note": "CPU only \u2014 no Vulkan."
+        },
+        "IQ2_M": {
+          "filename": "Mistral-7B-Instruct-v0.3-IQ2_M.gguf",
+          "download_size_gb": 3.0,
+          "min_ram_gb": 3.8,
+          "note": "CPU only \u2014 no Vulkan."
+        }
+      },
+      "prompt_format": "llama3",
+      "categories": [
+        "chat",
+        "writing"
+      ]
+    },
+    {
+      "id": "phi3.5-mini",
+      "name": "Phi-3.5 Mini 3.8B",
+      "tier": 3,
+      "hf_repo": "bartowski/Phi-3.5-mini-instruct-GGUF",
+      "best_for": "Complex reasoning, coding, math",
+      "languages": [
+        "english"
+      ],
+      "license": "MIT",
+      "note": "Microsoft's best small model. Punches above its weight.",
+      "verified": true,
+      "variants": {
+        "Q4_K_M": {
+          "filename": "Phi-3.5-mini-instruct-Q4_K_M.gguf",
+          "download_size_gb": 2.2,
+          "min_ram_gb": 4.5
+        }
+      },
+      "prompt_format": "phi3",
+      "categories": [
+        "reasoning",
+        "coding"
+      ]
+    },
+    {
+      "id": "llama3.2-3b",
+      "name": "Llama 3.2 3B",
+      "tier": 3,
+      "hf_repo": "bartowski/Llama-3.2-3B-Instruct-GGUF",
+      "best_for": "General purpose, writing, analysis",
+      "languages": [
+        "english"
+      ],
+      "license": "Llama 3.2 Community",
+      "note": "Well-rounded capable model for devices with 5GB+ RAM.",
+      "verified": true,
+      "variants": {
+        "Q4_K_M": {
+          "filename": "Llama-3.2-3B-Instruct-Q4_K_M.gguf",
+          "download_size_gb": 1.9,
+          "min_ram_gb": 4.0
+        },
+        "IQ3_M": {
+          "filename": "Llama-3.2-3B-Instruct-IQ3_M.gguf",
+          "download_size_gb": 1.6,
+          "min_ram_gb": 2.0,
+          "note": "CPU only \u2014 no Vulkan. Better quality than Q2_K at similar size."
+        },
+        "IQ2_M": {
+          "filename": "Llama-3.2-3B-Instruct-IQ2_M.gguf",
+          "download_size_gb": 1.23,
+          "min_ram_gb": 1.6,
+          "note": "CPU only \u2014 no Vulkan. Smallest 3B option."
+        }
+      },
+      "prompt_format": "llama3",
+      "categories": [
+        "chat"
+      ]
+    },
+    {
+      "id": "qwen2.5-3b",
+      "name": "Qwen2.5 3B",
+      "tier": 3,
+      "hf_repo": "Qwen/Qwen2.5-3B-Instruct-GGUF",
+      "best_for": "Advanced chat, coding, multilingual",
+      "languages": [
+        "english",
+        "chinese",
+        "multilingual"
+      ],
+      "license": "Apache 2.0",
+      "note": "Strong multilingual model. Needs 5GB+ RAM.",
+      "verified": true,
+      "variants": {
+        "Q4_K_M": {
+          "filename": "qwen2.5-3b-instruct-q4_k_m.gguf",
+          "download_size_gb": 1.9,
+          "min_ram_gb": 4.0
+        },
+        "IQ3_M": {
+          "filename": "Qwen2.5-3B-Instruct-IQ3_M.gguf",
+          "download_size_gb": 1.6,
+          "min_ram_gb": 2.0,
+          "note": "CPU only \u2014 no Vulkan."
+        },
+        "IQ2_M": {
+          "filename": "Qwen2.5-3B-Instruct-IQ2_M.gguf",
+          "download_size_gb": 1.25,
+          "min_ram_gb": 1.6,
+          "note": "CPU only \u2014 no Vulkan."
+        }
+      },
+      "prompt_format": "chatml",
+      "categories": [
+        "chat",
+        "multilingual"
+      ]
+    },
+    {
+      "id": "qwen2.5-coder-3b",
+      "name": "Qwen2.5 Coder 3B",
+      "tier": 3,
+      "hf_repo": "Qwen/Qwen2.5-Coder-3B-Instruct-GGUF",
+      "best_for": "Code generation, debugging, code review",
+      "languages": [
+        "english",
+        "chinese"
+      ],
+      "license": "Apache 2.0",
+      "note": "Best open coding model under 4GB. Great for developers.",
+      "verified": false,
+      "variants": {
+        "Q4_K_M": {
+          "filename": "qwen2.5-coder-3b-instruct-q4_k_m.gguf",
+          "download_size_gb": 1.9,
+          "min_ram_gb": 4.0
+        }
+      },
+      "prompt_format": "chatml",
+      "categories": [
+        "coding"
+      ]
+    },
+    {
+      "id": "deepseek-r1-7b",
+      "name": "DeepSeek R1 Distill 7B",
+      "tier": 3,
+      "hf_repo": "bartowski/DeepSeek-R1-Distill-Llama-8B-GGUF",
+      "best_for": "Advanced reasoning, math, logic, problem solving",
+      "languages": [
+        "english",
+        "chinese"
+      ],
+      "license": "MIT",
+      "note": "Powerful reasoning model. Shows thinking steps. Needs 6GB+ RAM.",
+      "verified": false,
+      "variants": {
+        "Q2_K": {
+          "filename": "DeepSeek-R1-Distill-Llama-8B-Q2_K.gguf",
+          "download_size_gb": 3.1,
+          "min_ram_gb": 5.0
+        },
+        "IQ3_M": {
+          "filename": "DeepSeek-R1-Distill-Llama-8B-IQ3_M.gguf",
+          "download_size_gb": 4.0,
+          "min_ram_gb": 4.8,
+          "note": "CPU only \u2014 no Vulkan. Better than Q2_K for reasoning tasks."
+        },
+        "IQ2_M": {
+          "filename": "DeepSeek-R1-Distill-Llama-8B-IQ2_M.gguf",
+          "download_size_gb": 3.2,
+          "min_ram_gb": 4.0,
+          "note": "CPU only \u2014 no Vulkan."
+        }
+      },
+      "prompt_format": "llama3",
+      "categories": [
+        "reasoning",
+        "math"
+      ]
+    },
+    {
+      "id": "gemma3-1b",
+      "name": "Gemma 3 1B",
+      "tier": 1,
+      "hf_repo": "bartowski/google_gemma-3-1b-it-GGUF",
+      "prompt_format": "gemma",
+      "categories": [
+        "chat",
+        "fast"
+      ],
+      "best_for": "Fast chat, lightweight tasks",
+      "languages": [
+        "english",
+        "multilingual"
+      ],
+      "license": "Gemma Terms",
+      "note": "Google's newest tiny model. Better quality than Gemma 2 2B at fraction of the RAM.",
+      "verified": false,
+      "variants": {
+        "Q4_K_M": {
+          "filename": "google_gemma-3-1b-it-Q4_K_M.gguf",
+          "download_size_gb": 0.7,
+          "min_ram_gb": 1.2
+        },
+        "Q2_K": {
+          "filename": "google_gemma-3-1b-it-Q2_K.gguf",
+          "download_size_gb": 0.5,
+          "min_ram_gb": 0.9
+        }
+      }
+    },
+    {
+      "id": "gemma3-4b",
+      "name": "Gemma 3 4B",
+      "tier": 2,
+      "hf_repo": "bartowski/google_gemma-3-4b-it-GGUF",
+      "prompt_format": "gemma",
+      "categories": [
+        "chat",
+        "reasoning",
+        "multilingual"
+      ],
+      "best_for": "High quality chat, reasoning, multilingual",
+      "languages": [
+        "english",
+        "multilingual"
+      ],
+      "license": "Gemma Terms",
+      "note": "Gemma 3 4B is competitive with much larger models. Excellent quality for its size.",
+      "verified": false,
+      "variants": {
+        "Q4_K_M": {
+          "filename": "google_gemma-3-4b-it-Q4_K_M.gguf",
+          "download_size_gb": 2.5,
+          "min_ram_gb": 3.5
+        },
+        "Q2_K": {
+          "filename": "google_gemma-3-4b-it-Q2_K.gguf",
+          "download_size_gb": 1.6,
+          "min_ram_gb": 2.5
+        },
+        "IQ3_M": {
+          "filename": "google_gemma-3-4b-it-IQ3_M.gguf",
+          "download_size_gb": 2.1,
+          "min_ram_gb": 2.6,
+          "note": "CPU only \u2014 no Vulkan."
+        },
+        "IQ2_M": {
+          "filename": "google_gemma-3-4b-it-IQ2_M.gguf",
+          "download_size_gb": 1.7,
+          "min_ram_gb": 2.1,
+          "note": "CPU only \u2014 no Vulkan."
+        }
+      }
+    },
+    {
+      "id": "phi4-mini",
+      "name": "Phi-4 Mini 3.8B",
+      "tier": 2,
+      "hf_repo": "bartowski/microsoft_Phi-4-mini-instruct-GGUF",
+      "prompt_format": "phi3",
+      "categories": [
+        "reasoning",
+        "coding",
+        "math",
+        "chat"
+      ],
+      "best_for": "Reasoning, coding, math \u2014 best small model for 2026",
+      "languages": [
+        "english"
+      ],
+      "license": "MIT",
+      "note": "Microsoft's newest small model. Significantly better than Phi-3.5 on reasoning and coding benchmarks.",
+      "verified": false,
+      "variants": {
+        "Q4_K_M": {
+          "filename": "microsoft_Phi-4-mini-instruct-Q4_K_M.gguf",
+          "download_size_gb": 2.3,
+          "min_ram_gb": 3.5
+        },
+        "Q2_K": {
+          "filename": "microsoft_Phi-4-mini-instruct-Q2_K.gguf",
+          "download_size_gb": 1.5,
+          "min_ram_gb": 2.5
+        },
+        "IQ3_M": {
+          "filename": "microsoft_Phi-4-mini-instruct-IQ3_M.gguf",
+          "download_size_gb": 2.0,
+          "min_ram_gb": 2.5,
+          "note": "CPU only \u2014 no Vulkan."
+        },
+        "IQ2_M": {
+          "filename": "microsoft_Phi-4-mini-instruct-IQ2_M.gguf",
+          "download_size_gb": 1.6,
+          "min_ram_gb": 2.0,
+          "note": "CPU only \u2014 no Vulkan."
+        }
+      }
+    },
+    {
+      "id": "smollm3-3b",
+      "name": "SmolLM3 3B",
+      "tier": 3,
+      "hf_repo": "bartowski/HuggingFaceTB_SmolLM3-3B-GGUF",
+      "prompt_format": "chatml",
+      "categories": [
+        "chat",
+        "reasoning",
+        "multilingual"
+      ],
+      "best_for": "Multilingual chat, reasoning, long context",
+      "languages": [
+        "english",
+        "french",
+        "spanish",
+        "german",
+        "italian",
+        "portuguese"
+      ],
+      "license": "Apache 2.0",
+      "note": "HuggingFace's latest 3B model. 128K context, 6 languages, strong reasoning. May require latest llama.cpp.",
+      "verified": false,
+      "variants": {
+        "Q4_K_M": {
+          "filename": "HuggingFaceTB_SmolLM3-3B-Q4_K_M.gguf",
+          "download_size_gb": 1.9,
+          "min_ram_gb": 4.0
+        },
+        "Q2_K": {
+          "filename": "HuggingFaceTB_SmolLM3-3B-Q2_K.gguf",
+          "download_size_gb": 1.2,
+          "min_ram_gb": 3.0
+        },
+        "IQ3_M": {
+          "filename": "HuggingFaceTB_SmolLM3-3B-IQ3_M.gguf",
+          "download_size_gb": 1.6,
+          "min_ram_gb": 2.0,
+          "note": "CPU only \u2014 no Vulkan."
+        },
+        "IQ2_M": {
+          "filename": "HuggingFaceTB_SmolLM3-3B-IQ2_M.gguf",
+          "download_size_gb": 1.25,
+          "min_ram_gb": 1.6,
+          "note": "CPU only \u2014 no Vulkan."
+        }
+      }
+    },
+    {
+      "id": "qwen3-1.7b",
+      "name": "Qwen3 1.7B",
+      "tier": 1,
+      "hf_repo": "bartowski/Qwen_Qwen3-1.7B-GGUF",
+      "prompt_format": "chatml",
+      "categories": [
+        "chat",
+        "reasoning",
+        "fast"
+      ],
+      "best_for": "Smart fast chat \u2014 noticeably smarter than Qwen2.5 at same size",
+      "languages": [
+        "english",
+        "chinese",
+        "multilingual"
+      ],
+      "license": "Apache 2.0",
+      "note": "Qwen3 generation \u2014 much better reasoning than Qwen2.5 1.5B. Supports /think mode for step-by-step reasoning.",
+      "verified": false,
+      "variants": {
+        "Q4_K_M": {
+          "filename": "Qwen_Qwen3-1.7B-Q4_K_M.gguf",
+          "download_size_gb": 1.1,
+          "min_ram_gb": 1.8
+        },
+        "Q2_K": {
+          "filename": "Qwen_Qwen3-1.7B-Q2_K.gguf",
+          "download_size_gb": 0.7,
+          "min_ram_gb": 1.2
+        }
+      }
+    },
+    {
+      "id": "qwen3-4b",
+      "name": "Qwen3 4B",
+      "tier": 2,
+      "hf_repo": "bartowski/Qwen_Qwen3-4B-GGUF",
+      "prompt_format": "chatml",
+      "categories": [
+        "chat",
+        "reasoning",
+        "coding"
+      ],
+      "best_for": "Best quality model under 3GB RAM \u2014 reasoning, coding, chat",
+      "languages": [
+        "english",
+        "chinese",
+        "multilingual"
+      ],
+      "license": "Apache 2.0",
+      "note": "The #1 recommendation for phones with 3GB+ free RAM. Qwen3 4B at Q4 needs ~2.75GB and performs far above its size. Supports /think mode.",
+      "verified": false,
+      "variants": {
+        "Q4_K_M": {
+          "filename": "Qwen_Qwen3-4B-Q4_K_M.gguf",
+          "download_size_gb": 2.5,
+          "min_ram_gb": 3.0
+        },
+        "Q2_K": {
+          "filename": "Qwen_Qwen3-4B-Q2_K.gguf",
+          "download_size_gb": 1.6,
+          "min_ram_gb": 2.2
+        },
+        "IQ3_M": {
+          "filename": "Qwen_Qwen3-4B-IQ3_M.gguf",
+          "download_size_gb": 2.0,
+          "min_ram_gb": 2.4,
+          "note": "CPU only \u2014 no Vulkan. Better quality than Q2_K at near same RAM."
+        },
+        "IQ2_M": {
+          "filename": "Qwen_Qwen3-4B-IQ2_M.gguf",
+          "download_size_gb": 1.65,
+          "min_ram_gb": 2.0,
+          "note": "CPU only \u2014 no Vulkan. Smaller than Q2_K with smarter weight preservation."
+        }
+      }
+    },
+    {
+      "id": "qwen3.5-4b",
+      "name": "Qwen3.5 4B",
+      "tier": 2,
+      "hf_repo": "bartowski/Qwen_Qwen3.5-4B-GGUF",
+      "prompt_format": "chatml",
+      "categories": [
+        "chat",
+        "reasoning",
+        "multilingual"
+      ],
+      "best_for": "Latest Qwen generation \u2014 200+ language support, best multilingual small model",
+      "languages": [
+        "english",
+        "chinese",
+        "multilingual"
+      ],
+      "license": "Apache 2.0",
+      "note": "Qwen3.5 is newer than Qwen3. 200+ languages, better reasoning. If Qwen3 4B fits, try this one next.",
+      "verified": false,
+      "variants": {
+        "Q4_K_M": {
+          "filename": "Qwen_Qwen3.5-4B-Q4_K_M.gguf",
+          "download_size_gb": 2.5,
+          "min_ram_gb": 3.2
+        },
+        "Q2_K": {
+          "filename": "Qwen_Qwen3.5-4B-Q2_K.gguf",
+          "download_size_gb": 1.6,
+          "min_ram_gb": 2.3
+        },
+        "IQ3_M": {
+          "filename": "Qwen_Qwen3.5-4B-IQ3_M.gguf",
+          "download_size_gb": 2.05,
+          "min_ram_gb": 2.5,
+          "note": "CPU only \u2014 no Vulkan. Better quality than Q2_K at near same RAM."
+        },
+        "IQ2_M": {
+          "filename": "Qwen_Qwen3.5-4B-IQ2_M.gguf",
+          "download_size_gb": 1.7,
+          "min_ram_gb": 2.1,
+          "note": "CPU only \u2014 no Vulkan."
+        }
+      }
+    }
+  ]
+}
