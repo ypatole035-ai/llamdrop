@@ -337,6 +337,7 @@ def run_chat(cmd, model_name, device_profile, model_path=None, prompt_format='ch
 
             elif user_input.lower() == "/clear":
                 history = []
+                _last_save_len = 0  # reset so auto-save triggers correctly from fresh start
                 print("  ✓ Conversation cleared")
                 continue
 
@@ -741,8 +742,17 @@ def _run_inference(cmd, prompt, max_tokens=300, temperature=0.7):
                         stderr=subprocess.PIPE,
                         text=True,
                     )
-                    raw_output = proc2.stdout.read()
+                    # Use same non-blocking thread pattern as the main path
+                    # to avoid freezing the spinner (same fix as #9)
+                    retry_lines = []
+                    def _collect_retry():
+                        for line in proc2.stdout:
+                            retry_lines.append(line)
+                    t_retry = threading.Thread(target=_collect_retry, daemon=True)
+                    t_retry.start()
+                    t_retry.join()
                     proc2.wait()
+                    raw_output = "".join(retry_lines)
                     clean_response = _extract_response(raw_output)
                 except Exception:
                     pass
