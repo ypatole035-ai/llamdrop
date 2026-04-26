@@ -287,6 +287,9 @@ def load_language():
             _current_lang = lang
     except Exception:
         _current_lang = "en"
+
+    # Bug #17 fix: warn on startup if any language is missing translation keys
+    check_missing_translations(warn=True)
     return _current_lang
 
 
@@ -310,6 +313,37 @@ def t(key):
     """
     lang_strings = STRINGS.get(_current_lang, STRINGS["en"])
     return lang_strings.get(key) or STRINGS["en"].get(key, key)
+
+
+def check_missing_translations(warn=True):
+    """
+    Bug #17 fix: compare every non-English language against the English
+    string table and report keys that are missing.  New strings added to
+    English silently go untranslated otherwise — this makes the gap visible.
+
+    Returns dict: {lang_code: [missing_key, ...]}
+    Set warn=True (default) to print a summary to stderr at startup.
+    """
+    import sys
+    en_keys = set(STRINGS["en"].keys())
+    missing = {}
+
+    for lang_code, lang_strings in STRINGS.items():
+        if lang_code == "en":
+            continue
+        absent = sorted(en_keys - set(lang_strings.keys()))
+        if absent:
+            missing[lang_code] = absent
+
+    if warn and missing:
+        for lang_code, keys in missing.items():
+            print(
+                f"[i18n] '{lang_code}' is missing {len(keys)} translation(s): "
+                + ", ".join(keys),
+                file=sys.stderr,
+            )
+
+    return missing
 
 
 def get_current_lang():
