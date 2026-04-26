@@ -435,4 +435,5 @@ def format_profile_summary(profile):
         f"{chip} · {cores} cores ({threads} perf) · "
         f"{avail}GB free / {total}GB RAM{swap_str} · "
         f"{plat}{class_str}"
-    )
+        )
+    
