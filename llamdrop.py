@@ -316,22 +316,6 @@ def show_device_info(device_profile, vulkan_info=None):
         3: "(Tier 3 — Better Hardware)"
     }
     print(f"  Max tier  : {device_profile['max_tier']} {tier_names.get(device_profile['max_tier'], '')}")
-
-    device_class = device_profile.get("device_class", "")
-    rec          = device_profile.get("recommendation", {})
-    if device_class:
-        print("")
-        print(c(BOLD, "  Device class & recommendation:"))
-        print(f"  Class     : {device_class}")
-        print(f"  Backend   : {rec.get('backend', 'llama.cpp')}")
-        print(f"  Best tier : Tier {rec.get('model_tier', '?')}")
-        suggested = rec.get("suggested_models", [])
-        if suggested:
-            print(f"  Try these : {', '.join(suggested)}")
-        note = rec.get("install_note", "")
-        if note:
-            print(c(CYAN, f"  Note      : {note}"))
-
     print("")
     print_ram_dashboard()
     input(f"  {t('press_enter_back')}")
@@ -659,41 +643,6 @@ def main():
     # Apply user config overrides to device profile
     apply_to_device_profile(device_profile)
     create_default_config()  # Create if not exists
-
-    # ── Tiered install: first-launch device briefing ──────────────────────────
-    first_run_flag = os.path.expanduser("~/.llamdrop/.welcomed")
-    if not os.path.exists(first_run_flag):
-        os.system("clear")
-        print_banner()
-        device_class = device_profile.get("device_class", "low")
-        rec          = device_profile.get("recommendation", {})
-        cpu_name     = device_profile["cpu"].get("chip", "Unknown")
-        threads      = device_profile["optimal_threads"]
-        ctx          = device_profile["safe_context"]
-        ram_avail    = device_profile["ram"].get("effective_avail_gb", 0)
-
-        print(c(BOLD, "  👋 Welcome to llamdrop!\n"))
-        print(c(CYAN, "  Detected your device:\n"))
-        print(f"   Chip     : {cpu_name}")
-        print(f"   RAM      : {ram_avail}GB effective")
-        print(f"   Class    : {device_class}")
-        print(f"   Threads  : {threads} performance cores")
-        print(f"   Context  : {ctx} tokens")
-        print("")
-        print(c(BOLD, "  Recommended setup:\n"))
-        print(f"   Backend  : {rec.get('backend', 'llama.cpp')}")
-        print(f"   Models   : {rec.get('install_note', '')}")
-        suggested = rec.get("suggested_models", [])
-        if suggested:
-            print(c(GREEN, f"   Start with: {', '.join(suggested)}"))
-        print("")
-        print("  llamdrop has auto-configured itself for your hardware.")
-        print("  Go to Browse & Download to grab your first model.\n")
-        input("  Press Enter to continue...")
-        try:
-            open(first_run_flag, "w").write("ok")
-        except Exception:
-            pass
 
     # Detect Vulkan once at startup
     print("  Checking GPU acceleration...", end="", flush=True)
