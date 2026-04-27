@@ -509,7 +509,7 @@ install_llamdrop() {
 
   for module in device.py browser.py downloader.py launcher.py chat.py \
                 hf_search.py ram_monitor.py updater.py i18n.py \
-                benchmarks.py doctor.py \
+                benchmarks.py doctor.py filecontext.py \
                 config.py battery.py; do
     curl -sL "$LLAMDROP_RAW/modules/$module" \
       -o "$LLAMDROP_DIR/modules/$module" 2>/dev/null || \
