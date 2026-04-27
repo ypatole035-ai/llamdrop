@@ -2,6 +2,15 @@
 
 ## v0.8.6 — Current
 
+### Cancelled downloads no longer show as valid models
+
+- **Cancelled download would appear as a working model** — if you cancelled a download halfway through, the partial file stayed on disk. llamdrop would then show it in "My Downloaded Models" looking exactly like a complete model. Selecting it and sending your first message would cause a crash because llama-cli hit the truncated end of the file. Three things were fixed to close this completely:
+  - When you cancel a download (Ctrl+C), the partial file is now immediately deleted. You'll see a confirmation message. If deletion fails, it tells you the exact path to remove manually.
+  - The "My Downloaded Models" screen now ignores any `.gguf` file under 50MB. Real models are never that small — anything under 50MB is guaranteed to be an incomplete file. It stays on disk so downloading it again will resume from where it left off, but it won't show up in your list.
+  - The "already downloaded" green tick in the model browser now also checks file size before showing. Previously it only checked if the file existed, so a partial file would show as fully downloaded.
+
+---
+
 ### The model list now knows what device you have
 
 Before this update, everyone saw the same list of models — a 135M tiny model would show up on a MacBook, and a 70B massive model would show up on a phone. That made no sense. Now llamdrop shows you only the models that actually make sense for your device.
