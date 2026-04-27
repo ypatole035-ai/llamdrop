@@ -45,6 +45,7 @@ UPDATE_FILES = {
     "models.json":               "models.json",
     "modules/backends/__init__.py": "modules/backends/__init__.py",
     "modules/backends/ollama.py":   "modules/backends/ollama.py",
+    "modules/filecontext.py":        "modules/filecontext.py",
 }
 
 # Files that should NEVER be touched by update
