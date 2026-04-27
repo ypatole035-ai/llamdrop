@@ -11,7 +11,7 @@ import curses
 import json
 import time
 
-VERSION = "0.8.5"
+VERSION = "0.8.6"
 
 # Ensure modules directory is on path
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
