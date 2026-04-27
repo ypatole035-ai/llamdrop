@@ -14,6 +14,16 @@ try:
 except ImportError:
     def get_all_benchmarks(): return {}
 
+try:
+    from specs import dp_ram_avail_gb, dp_ram_total_gb, dp_cpu_name, dp_tier, Tier
+except ImportError:
+    def dp_ram_avail_gb(p): return p.get("ram", {}).get("available_gb", 0) if hasattr(p, "get") else 0
+    def dp_ram_total_gb(p): return p.get("ram", {}).get("total_gb", 0) if hasattr(p, "get") else 0
+    def dp_cpu_name(p):     return p.get("cpu", {}).get("chip", "Unknown") if hasattr(p, "get") else "Unknown"
+    def dp_tier(p):         return p.get("device_class", "low") if hasattr(p, "get") else "low"
+    class Tier:
+        LOW = "low"; MID = "mid"; HIGH = "high"
+
 
 # ── Load model catalog ────────────────────────────────────────────────────────
 
@@ -44,18 +54,16 @@ def filter_models_for_device(models, device_profile):
     """
     Return only models that can run on this device.
     Also attaches the best variant and marks compatibility level.
+    Works with both DeviceProfile dataclass and legacy dict profiles.
     """
-    max_tier   = device_profile.get("max_tier", 1)
-    avail_ram  = device_profile["ram"].get("available_gb", 0)
+    avail_ram  = dp_ram_avail_gb(device_profile)
     # Give a small safety buffer
     usable_ram = avail_ram - 0.5
 
     results = []
     for model in models:
-        tier = model.get("tier", 2)
-        if tier > max_tier + 1:
-            # Too large — skip entirely
-            continue
+        # Filter purely by RAM — the max_tier field was unreliable and often
+        # hid perfectly valid models. RAM compatibility is the only real gate.
 
         # Find best variant for available RAM
         best_variant = None
@@ -127,10 +135,9 @@ TIER_LABELS = {
 
 def draw_header(stdscr, device_profile, width, category_label="All"):
     """Draw the top header bar with active category filter."""
-    ram   = device_profile["ram"]
-    avail = ram.get("available_gb", 0)
-    total = ram.get("total_gb", 0)
-    chip  = device_profile["cpu"].get("chip", "Unknown")[:25]
+    avail = dp_ram_avail_gb(device_profile)
+    total = dp_ram_total_gb(device_profile)
+    chip  = dp_cpu_name(device_profile)[:25]
 
     title = " 🦙 llamdrop — Model Browser "
     stdscr.attron(curses.color_pair(1) | curses.A_BOLD)

@@ -10,6 +10,11 @@ import urllib.parse
 import json
 import re
 
+try:
+    from specs import dp_ram_avail_gb
+except ImportError:
+    def dp_ram_avail_gb(p): return p.get("ram", {}).get("available_gb", 0) if hasattr(p, "get") else 0
+
 
 HF_API_BASE = "https://huggingface.co/api"
 
@@ -55,14 +60,17 @@ def _estimate_ram_from_size_gb(size_gb, quant_key):
 
 
 def _parse_quant_from_filename(filename):
-    """Extract quantization type from filename, e.g. Q4_K_M, Q2_K."""
+    """Extract quantization type from filename, e.g. Q4_K_M, Q2_K, IQ4_XS.
+    IQ patterns must be checked before Q patterns — 'IQ3_M' would otherwise
+    match the Q\\d+ pattern as 'Q3'.
+    """
     filename = filename.upper()
     patterns = [
+        r'(IQ\d+_[A-Z]+)',   # IQ4_XS, IQ3_M etc.  — MUST come before Q patterns
         r'(Q\d+_K_[SML])',   # Q4_K_M, Q4_K_S, Q5_K_L etc.
         r'(Q\d+_K)',          # Q4_K, Q2_K
         r'(Q\d+_\d)',         # Q4_0, Q5_1
         r'(Q\d+)',            # Q4, Q8
-        r'(IQ\d+_[A-Z]+)',   # IQ4_XS etc.
     ]
     for pat in patterns:
         m = re.search(pat, filename)
@@ -109,7 +117,7 @@ def search_hf_models(query, device_profile, limit=20):
     Returns:
         list of model dicts (same format as models.json entries)
     """
-    avail_ram = device_profile["ram"].get("available_gb", 0) - 0.5
+    avail_ram = dp_ram_avail_gb(device_profile) - 0.5
 
     # Build search URL
     # HF API: search by library=gguf, sort by downloads, filter by search term

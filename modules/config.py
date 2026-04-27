@@ -138,36 +138,66 @@ def save_config(updates):
 
 def create_default_config():
     """
-    Write a default config.json with comments as keys.
+    Write a default config.json on first install.
+    Only writes actual settable keys — no pseudo-comment keys that pollute
+    the schema and confuse load_config().
     Called on first install or when user asks to reset config.
     """
-    default = {
-        "_note": "Edit this file to override llamdrop's auto-detected settings.",
-        "_note2": "Delete any key to let llamdrop auto-detect it again.",
-        "max_tokens":         300,
-        "temperature":        0.7,
-        "auto_save_sessions": True,
-        "warn_battery_below": 15,
-    }
     os.makedirs(LLAMDROP_DIR, exist_ok=True)
     if not os.path.exists(CONFIG_FILE):
+        default = {
+            "max_tokens":         300,
+            "temperature":        0.7,
+            "auto_save_sessions": True,
+            "warn_battery_below": 15,
+        }
         with open(CONFIG_FILE, "w") as f:
             json.dump(default, f, indent=2)
+        # Write a separate human-readable README alongside the config
+        readme = CONFIG_FILE.replace(".json", "_README.txt")
+        try:
+            with open(readme, "w") as f:
+                f.write(
+                    "llamdrop config.json — edit this file to override auto-detected settings.\n"
+                    "Delete any key to let llamdrop auto-detect it again.\n\n"
+                    "Available keys:\n"
+                    "  threads            — CPU thread count (int, 1–32)\n"
+                    "  context_size       — context window in tokens (int, 128–8192)\n"
+                    "  batch_size         — batch size (int, 32–2048)\n"
+                    "  max_tokens         — max tokens per response (int, 50–2048)\n"
+                    "  temperature        — sampling temperature (float, 0.0–2.0)\n"
+                    "  system_prompt      — custom system prompt (string)\n"
+                    "  auto_save_sessions — auto-save conversations (bool)\n"
+                    "  warn_battery_below — warn if battery % below this (int, 0–100)\n"
+                )
+        except Exception:
+            pass
 
 
 def apply_to_device_profile(device_profile):
     """
     Override device_profile values with user config where set.
-    device_profile is modified in place.
+    Supports both DeviceProfile dataclass (specs.py) and legacy dict.
+    device_profile is modified in place (dict) or via setattr (dataclass).
     """
     config = load_config()
 
-    if config.get("threads") is not None:
-        device_profile["optimal_threads"] = config["threads"]
-    if config.get("context_size") is not None:
-        device_profile["safe_context"] = config["context_size"]
-    if config.get("batch_size") is not None:
-        device_profile["safe_batch"] = config["batch_size"]
+    if hasattr(device_profile, "threads"):
+        # New-style DeviceProfile dataclass
+        if config.get("threads") is not None:
+            device_profile.threads    = config["threads"]
+        if config.get("context_size") is not None:
+            device_profile.ctx_size   = config["context_size"]
+        if config.get("batch_size") is not None:
+            device_profile.batch_size = config["batch_size"]
+    else:
+        # Legacy dict profile
+        if config.get("threads") is not None:
+            device_profile["optimal_threads"] = config["threads"]
+        if config.get("context_size") is not None:
+            device_profile["safe_context"] = config["context_size"]
+        if config.get("batch_size") is not None:
+            device_profile["safe_batch"] = config["batch_size"]
 
     return device_profile
 

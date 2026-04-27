@@ -47,13 +47,18 @@ SESSIONS_DIR = os.path.expanduser("~/.llamdrop/sessions")
 BIN_DIR      = os.path.expanduser("~/.llamdrop/bin")
 
 
-def _clean_memory():
-    """Release Python and OS memory after each inference. Borrowed from AirLLM."""
+def _clean_memory(force=False):
+    """Release Python and OS memory after inference.
+    Only calls malloc_trim when RAM is actually under pressure (< 1.5 GB free)
+    or force=True, to avoid latency overhead on every response.
+    Borrowed from AirLLM.
+    """
     gc.collect()
-    try:
-        ctypes.CDLL("libc.so.6").malloc_trim(0)
-    except Exception:
-        pass
+    if force or get_available_ram_gb() < 1.5:
+        try:
+            ctypes.CDLL("libc.so.6").malloc_trim(0)
+        except Exception:
+            pass
 
 
 def _get_env():
@@ -253,7 +258,12 @@ def _dispatch_inference(cmd, prompt, max_tokens, temperature, device_profile,
 
     Returns (raw_output, clean_response, backend_used).
     """
-    ollama_info = device_profile.get("ollama", {})
+    # device_profile may be a DeviceProfile dataclass (specs.py) or a legacy dict.
+    # Dataclasses don't have .get() — always read ollama info safely.
+    if hasattr(device_profile, "get"):
+        ollama_info = device_profile.get("ollama", {})
+    else:
+        ollama_info = {}  # DeviceProfile dataclass: Ollama running status not stored here
 
     if ollama_model and ollama_info.get("running"):
         try:
@@ -266,7 +276,10 @@ def _dispatch_inference(cmd, prompt, max_tokens, temperature, device_profile,
         except ImportError:
             pass  # backends/ollama.py not present — fall through
 
-    # Default: llama.cpp
+    # Default: llama.cpp — only if a valid command was provided
+    if not cmd:
+        # No llama.cpp command available (e.g. called from Ollama path with cmd=[])
+        return None, "[no response — llama.cpp cmd not provided]", "none"
     raw_out, clean_response = _run_inference(cmd, prompt, max_tokens, temperature)
     return raw_out, clean_response, "llama.cpp"
 
@@ -338,6 +351,9 @@ def run_chat(cmd, model_name, device_profile, model_path=None, prompt_format='ch
             elif user_input.lower() == "/clear":
                 history = []
                 _last_save_len = 0  # reset so auto-save triggers correctly from fresh start
+                # Overwrite the session file so the cleared state is persisted
+                # and the old history can't be resumed by mistake.
+                save_session(session_name, model_name, history)
                 print("  ✓ Conversation cleared")
                 continue
 
@@ -523,7 +539,6 @@ def _build_gemma(history, system_prompt=None):
             parts.append(f"<start_of_turn>user\n{content}<end_of_turn>")
         else:
             parts.append(f"<start_of_turn>model\n{content}<end_of_turn>")
-            first = False
     parts.append("<start_of_turn>model")
     return "\n".join(parts)
 
@@ -843,9 +858,14 @@ def _export_chat(history, model_name):
 
 
 def _print_chat_header(model_name, device_profile):
-    ram   = device_profile["ram"]
-    avail = ram.get("available_gb", 0)
-    ctx   = device_profile.get("safe_context", 1024)
+    # Support both DeviceProfile dataclass (specs.py) and legacy dict
+    if hasattr(device_profile, "ram_avail_gb"):
+        avail = device_profile.ram_avail_gb
+        ctx   = device_profile.ctx_size
+    else:
+        ram   = device_profile["ram"]
+        avail = ram.get("available_gb", 0)
+        ctx   = device_profile.get("safe_context", 1024)
     print("\n")
     print("  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
     print(f"  🦙 Chat · {model_name}")

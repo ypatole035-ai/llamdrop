@@ -11,13 +11,19 @@ import curses
 import json
 import time
 
-VERSION = "0.7.2"
+VERSION = "0.8.0"
 
 # Ensure modules directory is on path
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(SCRIPT_DIR, "modules"))
 
-from device      import get_device_profile, format_profile_summary
+from device      import get_device_profile, format_profile_summary, get_full_profile
+try:
+    from specs import (build_device_profile, format_device_profile,
+                       format_model_recommendations, DeviceProfile)
+    _SPECS_OK = True
+except ImportError:
+    _SPECS_OK = False
 from browser     import show_browser, run_browser
 from downloader  import (download_model, get_downloaded_models,
                           get_all_gguf_files, model_is_downloaded,
@@ -273,63 +279,109 @@ def show_hf_search(device_profile):
 # ── Device info screen ────────────────────────────────────────────────────────
 
 def show_device_info(device_profile, vulkan_info=None):
+    """
+    Phase 5 — Device Profile screen.
+    Shows the rich DeviceProfile card from specs.py when available,
+    including: platform, tier, backend decision + reason, all runtime flags,
+    GPU status with explanation, and model recommendations.
+    Falls back to legacy display if specs.py is unavailable.
+    """
     os.system("clear")
     print_banner()
-    ram  = device_profile["ram"]
-    cpu  = device_profile["cpu"]
-    stor = device_profile["storage"]
+    print(c(BOLD, f"  {t('menu_device')}\n"))
 
-    print(c(BOLD, f"  {t('menu_device')}:\n"))
-    print(f"  Platform  : {device_profile['platform']}")
-    print(f"  Chip      : {cpu.get('chip', 'Unknown')}")
-    print(f"  Cores     : {cpu.get('cores', '?')}")
-    print(f"  Arch      : {cpu.get('arch', '?')}")
-    print(f"  RAM total : {ram.get('total_gb', '?')} GB")
-    print(f"  RAM free  : {ram.get('available_gb', '?')} GB")
-    if ram.get('swap_total_gb', 0) > 0:
-        print(f"  Swap/zram : {ram.get('swap_free_gb', 0)} GB free / {ram.get('swap_total_gb', 0)} GB")
-        print(f"  Effective : {ram.get('effective_avail_gb', ram.get('available_gb', '?'))} GB (RAM + swap)")
-    print(f"  Storage   : {stor.get('free_gb', '?')} GB free / {stor.get('total_gb', '?')} GB")
+    if _SPECS_OK:
+        # ── Rich specs.py Device Profile card ────────────────────────────────
+        try:
+            rich_profile = build_device_profile()
+            # Print the full Device Profile card
+            card = format_device_profile(rich_profile)
+            for line in card.splitlines():
+                print("  " + line if not line.startswith("  ") else line)
 
-    # Vulkan info
+            # Model recommendations
+            print(c(BOLD, "\n  MODEL RECOMMENDATIONS"))
+            recs_text = format_model_recommendations(rich_profile)
+            for line in recs_text.splitlines():
+                if line.strip().startswith("★"):
+                    print(c(GREEN, line))
+                elif line.strip().startswith("⚠"):
+                    print(c(YELLOW, line))
+                else:
+                    print(line)
+
+            # Live RAM bar at bottom
+            print("")
+            print_ram_dashboard()
+            input(f"  {t('press_enter_back')}")
+            return
+        except Exception as e:
+            print(c(YELLOW, f"  (specs.py error: {e} — falling back)\n"))
+
+    # ── Legacy display (fallback) — works for both dict and DeviceProfile ────────
+    from specs import dp_ram_avail_gb, dp_ram_total_gb, dp_cpu_name, dp_threads, dp_ctx, dp_batch
+
+    if hasattr(device_profile, "ram_total_gb"):
+        # DeviceProfile dataclass
+        platform_str = device_profile.platform
+        chip         = device_profile.cpu_model
+        cores        = device_profile.cpu_cores
+        arch         = device_profile.cpu_arch
+        ram_total    = device_profile.ram_total_gb
+        ram_free     = device_profile.ram_avail_gb
+        swap_free    = device_profile.swap_free_gb
+        ram_eff      = device_profile.ram_effective_gb
+        stor_free    = device_profile.storage_free_gb
+        stor_total   = device_profile.storage_total_gb
+        threads_val  = device_profile.threads
+        ctx_val      = device_profile.ctx_size
+        batch_val    = device_profile.batch_size
+        backend_val  = device_profile.backend
+    else:
+        # Legacy dict
+        ram         = device_profile.get("ram", {})
+        cpu         = device_profile.get("cpu", {})
+        stor        = device_profile.get("storage", {})
+        platform_str = device_profile.get("platform", "unknown")
+        chip         = cpu.get("chip", "Unknown")
+        cores        = cpu.get("cores", "?")
+        arch         = cpu.get("arch", "?")
+        ram_total    = ram.get("total_gb", "?")
+        ram_free     = ram.get("available_gb", "?")
+        swap_free    = ram.get("swap_free_gb", 0)
+        ram_eff      = ram.get("effective_avail_gb", "?")
+        stor_free    = stor.get("free_gb", "?")
+        stor_total   = stor.get("total_gb", "?")
+        threads_val  = device_profile.get("optimal_threads", "?")
+        ctx_val      = device_profile.get("safe_context", "?")
+        batch_val    = device_profile.get("safe_batch", "?")
+        backend_val  = device_profile.get("recommendation", {}).get("backend", "llama.cpp")
+
+    print(f"  Platform  : {platform_str}")
+    print(f"  Chip      : {chip}")
+    print(f"  Cores     : {cores}")
+    print(f"  Arch      : {arch}")
+    print(f"  RAM total : {ram_total} GB")
+    print(f"  RAM free  : {ram_free} GB")
+    if swap_free and float(swap_free) > 0:
+        print(f"  Swap/zram : {swap_free} GB free")
+        print(f"  Effective : {ram_eff} GB")
+    print(f"  Storage   : {stor_free} GB free / {stor_total} GB")
+
     print("")
     print(c(BOLD, "  GPU / Acceleration:"))
-    if vulkan_info:
-        if vulkan_info.get("available"):
-            print(c(GREEN, f"  Vulkan    : ✓ {vulkan_info['gpu_type']}"))
-            print(f"  Note      : {vulkan_info.get('note', '')}")
-        else:
-            print(c(YELLOW, f"  Vulkan    : ✗ Not available ({vulkan_info.get('note', 'CPU only')})"))
+    if vulkan_info and vulkan_info.get("available"):
+        print(c(GREEN, f"  Vulkan    : ✓ {vulkan_info['gpu_type']}"))
     else:
-        print("  Vulkan    : (not checked)")
+        note = (vulkan_info or {}).get('note', 'CPU only')
+        print(c(YELLOW, f"  GPU       : ✗ {note}"))
 
     print("")
-    print(c(BOLD, "  llamdrop settings:"))
-    print(f"  Threads   : {device_profile['optimal_threads']}")
-    print(f"  Context   : {device_profile['safe_context']} tokens")
-    print(f"  Batch     : {device_profile['safe_batch']}")
-    tier_names = {
-        0: "(too low — close other apps)",
-        1: "(Tier 1 — Ultra Low RAM)",
-        2: "(Tier 2 — Standard)",
-        3: "(Tier 3 — Better Hardware)"
-    }
-    print(f"  Max tier  : {device_profile['max_tier']} {tier_names.get(device_profile['max_tier'], '')}")
-
-    device_class = device_profile.get("device_class", "")
-    rec          = device_profile.get("recommendation", {})
-    if device_class:
-        print("")
-        print(c(BOLD, "  Device class & recommendation:"))
-        print(f"  Class     : {device_class}")
-        print(f"  Backend   : {rec.get('backend', 'llama.cpp')}")
-        print(f"  Best tier : Tier {rec.get('model_tier', '?')}")
-        suggested = rec.get("suggested_models", [])
-        if suggested:
-            print(f"  Try these : {', '.join(suggested)}")
-        note = rec.get("install_note", "")
-        if note:
-            print(c(CYAN, f"  Note      : {note}"))
+    print(c(BOLD, "  Runtime flags:"))
+    print(f"  Threads   : {threads_val}")
+    print(f"  Context   : {ctx_val} tokens")
+    print(f"  Batch     : {batch_val}")
+    print(f"  Backend   : {backend_val}")
 
     print("")
     print_ram_dashboard()
@@ -353,11 +405,14 @@ def show_downloaded_models(device_profile):
 
         # Scan phone for other GGUFs
         print(f"  Scanning for GGUF files on your device...", end="", flush=True)
-        all_files = get_all_gguf_files()
+        try:
+            all_files = get_all_gguf_files()
+        except Exception:
+            all_files = []
+        print(" done\n")
         # all_files already includes managed ones — deduplicate by path
         managed_paths = {m["path"] for m in managed}
         external = [f for f in all_files if f["path"] not in managed_paths]
-        print(" done\n")
 
         combined = managed + external
 
@@ -653,7 +708,17 @@ def main():
     load_language()
 
     print(f"  {t('loading')}")
-    device_profile = get_device_profile()
+    device_profile = get_device_profile()  # legacy dict — always works
+
+    # Bug #8 fix: when specs.py is available, build the rich DeviceProfile and
+    # use it as the working profile for ALL runtime paths (launch, chat, config).
+    # Previously the dataclass was only used for display while the legacy dict
+    # was passed to every functional module, losing all the new flag computation.
+    if _SPECS_OK:
+        try:
+            device_profile = build_device_profile()
+        except Exception:
+            pass  # fall back to legacy dict silently
 
     # Apply user config overrides to device profile
     apply_to_device_profile(device_profile)
@@ -664,48 +729,122 @@ def main():
     if not os.path.exists(first_run_flag):
         os.system("clear")
         print_banner()
-        device_class = device_profile.get("device_class", "low")
-        rec          = device_profile.get("recommendation", {})
-        cpu_name     = device_profile["cpu"].get("chip", "Unknown")
-        threads      = device_profile["optimal_threads"]
-        ctx          = device_profile["safe_context"]
-        ram_avail    = device_profile["ram"].get("effective_avail_gb", 0)
+        # Read display values safely from either profile type
+        if hasattr(device_profile, "tier"):
+            device_class = device_profile.tier
+            rec          = {}
+            cpu_name     = device_profile.cpu_model
+            threads      = device_profile.threads
+            ctx          = device_profile.ctx_size
+            ram_avail    = device_profile.ram_effective_gb
+        else:
+            device_class = device_profile.get("device_class", "low")
+            rec          = device_profile.get("recommendation", {})
+            cpu_name     = device_profile["cpu"].get("chip", "Unknown")
+            threads      = device_profile["optimal_threads"]
+            ctx          = device_profile["safe_context"]
+            ram_avail    = device_profile["ram"].get("effective_avail_gb", 0)
 
         print(c(BOLD, "  👋 Welcome to llamdrop!\n"))
-        print(c(CYAN, "  Detected your device:\n"))
-        print(f"   Chip     : {cpu_name}")
-        print(f"   RAM      : {ram_avail}GB effective")
-        print(f"   Class    : {device_class}")
-        print(f"   Threads  : {threads} performance cores")
-        print(f"   Context  : {ctx} tokens")
-        print("")
-        print(c(BOLD, "  Recommended setup:\n"))
-        print(f"   Backend  : {rec.get('backend', 'llama.cpp')}")
-        print(f"   Models   : {rec.get('install_note', '')}")
-        suggested = rec.get("suggested_models", [])
-        if suggested:
-            print(c(GREEN, f"   Start with: {', '.join(suggested)}"))
-        print("")
-        print("  llamdrop has auto-configured itself for your hardware.")
-        print("  Go to Browse & Download to grab your first model.\n")
-        input("  Press Enter to continue...")
+
+        if _SPECS_OK:
+            try:
+                _fp = build_device_profile()
+                print(c(CYAN, "  Analysing your hardware...\n"))
+                card = format_device_profile(_fp)
+                for line in card.splitlines():
+                    print("  " + line if not line.startswith("  ") else line)
+                recs_text = format_model_recommendations(_fp)
+                for line in recs_text.splitlines():
+                    if line.strip().startswith("★"):
+                        print(c(GREEN, line))
+                    elif line.strip().startswith("⚠"):
+                        print(c(YELLOW, line))
+                    else:
+                        print(line)
+                print("  llamdrop has auto-configured itself for your hardware.")
+                print("  Go to Browse & Download to grab your first model.\n")
+                input("  Press Enter to continue...")
+            except Exception:
+                # Fallback to legacy first-run screen
+                print(c(CYAN, "  Detected your device:\n"))
+                print(f"   Chip     : {cpu_name}")
+                print(f"   RAM      : {ram_avail}GB effective")
+                print(f"   Class    : {device_class}")
+                print(f"   Threads  : {threads} performance cores")
+                print(f"   Context  : {ctx} tokens")
+                print("")
+                suggested = rec.get("suggested_models", [])
+                if suggested:
+                    print(c(GREEN, f"   Start with: {', '.join(suggested)}"))
+                print("")
+                print("  llamdrop has auto-configured itself for your hardware.\n")
+                input("  Press Enter to continue...")
+        else:
+            print(c(CYAN, "  Detected your device:\n"))
+            print(f"   Chip     : {cpu_name}")
+            print(f"   RAM      : {ram_avail}GB effective")
+            print(f"   Class    : {device_class}")
+            print(f"   Threads  : {threads} performance cores")
+            suggested = rec.get("suggested_models", [])
+            if suggested:
+                print(c(GREEN, f"   Start with: {', '.join(suggested)}"))
+            print("")
+            print("  llamdrop has auto-configured itself for your hardware.\n")
+            input("  Press Enter to continue...")
         try:
             open(first_run_flag, "w").write("ok")
         except Exception:
             pass
 
-    # Detect Vulkan once at startup
+    # Detect GPU acceleration at startup using specs.py when available.
+    # specs.py correctly marks Mali/Adreno as gpu_usable=False even when Vulkan
+    # hardware is present — because Mali Vulkan is slower than CPU for LLM.
     print("  Checking GPU acceleration...", end="", flush=True)
-    vulkan_info = detect_vulkan()
-    if vulkan_info.get("available"):
-        print(c(GREEN, f" ✓ {vulkan_info['gpu_type']}"))
+    vulkan_info = None
+    if _SPECS_OK:
+        try:
+            _startup_profile = build_device_profile()
+            if _startup_profile.gpu_usable:
+                print(c(GREEN, f" ✓ {_startup_profile.gpu_model}"))
+                vulkan_info = {"available": True,
+                               "gpu_type": _startup_profile.gpu_model,
+                               "note": _startup_profile.gpu_note}
+            else:
+                gpu_note = _startup_profile.gpu_note or "CPU only"
+                print(f" CPU only")
+                if _startup_profile.gpu_vendor not in ("none",):
+                    # GPU exists but disabled — tell the user why
+                    print(c(YELLOW, f"  Note: {gpu_note}"))
+                vulkan_info = {"available": False,
+                               "gpu_type": _startup_profile.gpu_model,
+                               "note": gpu_note}
+        except Exception:
+            vulkan_info = detect_vulkan()
+            if vulkan_info.get("available"):
+                print(c(GREEN, f" ✓ {vulkan_info['gpu_type']}"))
+            else:
+                print(" CPU only")
     else:
-        print(" CPU only")
+        vulkan_info = detect_vulkan()
+        if vulkan_info.get("available"):
+            print(c(GREEN, f" ✓ {vulkan_info['gpu_type']}"))
+        else:
+            print(" CPU only")
 
-    # Find models.json
-    models_json = os.path.join(SCRIPT_DIR, "models.json")
-    if not os.path.exists(models_json):
-        models_json = os.path.expanduser("~/.llamdrop/models.json")
+    # Find models.json — prefer the user data copy in ~/.llamdrop (kept current
+    # by the background updater) over the bundled copy in SCRIPT_DIR.
+    # Bug #12 fix: previously SCRIPT_DIR was tried first, so the background
+    # updater's writes to ~/.llamdrop/models.json were silently ignored when
+    # llamdrop was installed anywhere other than ~/.llamdrop.
+    _user_models_json   = os.path.expanduser("~/.llamdrop/models.json")
+    _bundled_models_json = os.path.join(SCRIPT_DIR, "models.json")
+    if os.path.exists(_user_models_json):
+        models_json = _user_models_json
+    elif os.path.exists(_bundled_models_json):
+        models_json = _bundled_models_json
+    else:
+        models_json = _user_models_json  # will be created by background update
 
     # Background updater
     run_background_update(VERSION)

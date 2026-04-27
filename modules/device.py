@@ -77,9 +77,9 @@ def get_cpu_info():
 
         # Translate internal codes to friendly names
         chip_map = {
-            "MT6853": "MediaTek Dimensity 720",
-            "MT6853V": "MediaTek Dimensity 720",
-            "MT6853V/TNZA": "MediaTek Dimensity 720",
+            "MT6853": "MediaTek Dimensity 800U",
+            "MT6853V": "MediaTek Dimensity 800U",
+            "MT6853V/TNZA": "MediaTek Dimensity 800U",
             "MT6877": "MediaTek Dimensity 900",
             "MT6877V": "MediaTek Dimensity 900",
             "MT6879": "MediaTek Dimensity 1080",
@@ -436,3 +436,18 @@ def format_profile_summary(profile):
         f"{avail}GB free / {total}GB RAM{swap_str} · "
         f"{plat}{class_str}"
     )
+
+
+# ── v0.8 bridge: expose specs.py DeviceProfile ──────────────────────────────
+
+def get_full_profile():
+    """
+    v0.8: Returns the rich DeviceProfile dataclass from specs.py.
+    This is the preferred call for all new code.
+    Existing code can continue using get_device_profile() (legacy dict).
+    """
+    try:
+        from modules.specs import build_device_profile
+    except ImportError:
+        from specs import build_device_profile
+    return build_device_profile()

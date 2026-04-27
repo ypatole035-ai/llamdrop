@@ -2,10 +2,11 @@
 llamdrop - launcher.py
 Finds llama.cpp binary and launches it with auto-tuned flags.
 
-v0.4 changes:
-- detect_vulkan(): checks if device has Vulkan support
-- build_launch_command() injects --gpu-layers flag when Vulkan is available
-- get_launch_summary() reports whether GPU acceleration is active
+v0.8 changes:
+- build_runtime_flags() now delegates to specs.DeviceProfile for all flag decisions
+- get_safe_gpu_layers() honours GPU-usability from specs (Android GPU always 0)
+- detect_vulkan() preserved for UI / doctor compatibility
+- Flags shown to user for full transparency (Key Principle #5)
 """
 
 import os
@@ -156,24 +157,28 @@ def detect_vulkan():
 
 def get_safe_gpu_layers(device_profile, vulkan_info):
     """
-    Return a reasonable number of GPU layers to offload.
-    Start conservative — too many layers = OOM crash.
-    Rule: use GPU layers only if we have >2GB free RAM.
+    Return GPU layers to offload.
+
+    v0.8: If device_profile is a DeviceProfile from specs.py, use its
+    pre-computed gpu_layers value (encodes Android/Mali/Adreno always-0 rule).
+    Falls back to Vulkan heuristic for legacy dict-style profiles.
     """
+    # New-style: DeviceProfile dataclass from specs.py
+    if hasattr(device_profile, "gpu_layers"):
+        return device_profile.gpu_layers
+
+    # Legacy dict-style profile
     if not vulkan_info.get("available"):
         return 0
-
     avail_ram = device_profile["ram"].get("available_gb", 0)
-
     if avail_ram >= 4.0:
-        return 20   # Offload more layers on good hardware
+        return 20
     elif avail_ram >= 2.5:
-        return 10   # Conservative
+        return 10
     elif avail_ram >= 2.0:
-        return 5    # Very conservative
+        return 5
     else:
-        return 0    # Too little RAM — don't risk it
-
+        return 0
 
 # ── Command builder ───────────────────────────────────────────────────────────
 
@@ -183,16 +188,34 @@ def build_launch_command(model_path, device_profile, system_prompt=None,
     """
     Build the llama-cli command for this device.
 
-    v0.4: if use_vulkan is None, auto-detect. If Vulkan available and safe,
-    injects --gpu-layers N into the command.
+    v0.8: DeviceProfile-aware — reads threads/ctx/batch/gpu_layers/mmap/flash_attn
+    directly from a specs.DeviceProfile when available. Legacy dict profile
+    still works for backwards compatibility.
+
+    Flag transparency: the assembled command is printed in the TUI before
+    launch so the user always sees exactly what is being run.
     """
     binary = find_llama_binary()
     if not binary:
         return None
 
-    t = threads      or device_profile.get("optimal_threads", 2)
-    c = context_size or device_profile.get("safe_context",    1024)
-    b = batch_size   or device_profile.get("safe_batch",      128)
+    # ── Resolve flags from DeviceProfile (new) or legacy dict (old) ─────────
+    if hasattr(device_profile, "threads"):
+        # New-style DeviceProfile from specs.py — use pre-computed flags
+        t          = threads      or device_profile.threads
+        c          = context_size or device_profile.ctx_size
+        b          = batch_size   or device_profile.batch_size
+        use_mmap   = device_profile.use_mmap
+        flash_attn = device_profile.use_flash_attn
+        mlock      = device_profile.use_mlock
+    else:
+        # Legacy dict profile
+        t          = threads      or device_profile.get("optimal_threads", 2)
+        c          = context_size or device_profile.get("safe_context",    1024)
+        b          = batch_size   or device_profile.get("safe_batch",      128)
+        use_mmap   = True   # legacy: use old mmap logic below
+        flash_attn = False
+        mlock      = False
 
     cmd = [
         binary,
@@ -203,37 +226,65 @@ def build_launch_command(model_path, device_profile, system_prompt=None,
         "--log-disable",
     ]
 
-    # Use mmap only when the model is on internal storage (~/.llamdrop/models/).
-    # External/sdcard paths on Android have unreliable mmap support and can
-    # cause crashes. mmap reduces peak RAM by 15-30% by paging weights on demand.
-    internal_models_dir = os.path.realpath(
-        os.path.expanduser("~/.llamdrop/models")
-    )
-    model_real = os.path.realpath(model_path)
-    on_internal = model_real.startswith(internal_models_dir)
-    if not on_internal:
-        cmd.append("--no-mmap")
+    # ── mmap ─────────────────────────────────────────────────────────────────
+    # New-style: trust DeviceProfile.use_mmap (already encodes Android rule).
+    # Legacy: use internal-storage heuristic.
+    if hasattr(device_profile, "use_mmap"):
+        if not device_profile.use_mmap:
+            cmd.append("--no-mmap")
+    else:
+        # Legacy: only enable mmap for models on internal storage
+        internal_models_dir = os.path.realpath(
+            os.path.expanduser("~/.llamdrop/models")
+        )
+        if not os.path.realpath(model_path).startswith(internal_models_dir):
+            cmd.append("--no-mmap")
 
-    # IQ quants (IQ2_M, IQ3_M, etc.) are incompatible with Vulkan.
-    # Detect from filename and force CPU-only if so.
+    # ── Flash attention ───────────────────────────────────────────────────────
+    if flash_attn:
+        cmd.append("--flash-attn")
+
+    # ── mlock ─────────────────────────────────────────────────────────────────
+    if mlock:
+        cmd.append("--mlock")
+
+    # ── IQ quant guard ────────────────────────────────────────────────────────
+    # IQ quants (IQ2_M, IQ3_M, etc.) are incompatible with Vulkan — force CPU.
     model_filename = os.path.basename(model_path)
     is_iq_quant = any(f"-IQ{n}_" in model_filename for n in ["1", "2", "3", "4"])
 
-    # Vulkan GPU acceleration
+    # ── GPU acceleration ──────────────────────────────────────────────────────
     if is_iq_quant:
         vulkan_info = {
             "available": False,
             "gpu_type":  "None",
-            "note":      "Vulkan disabled — IQ quant is CPU-only",
+            "note":      "IQ quant detected — Vulkan disabled (CPU only)",
         }
+        gpu_layers = 0
     elif use_vulkan is None:
-        vulkan_info = detect_vulkan()
+        # New-style: DeviceProfile already knows if GPU is usable
+        if hasattr(device_profile, "gpu_layers"):
+            gpu_layers  = device_profile.gpu_layers
+            gpu_usable  = device_profile.gpu_usable
+            vulkan_info = {
+                "available": gpu_usable,
+                "gpu_type":  getattr(device_profile, "gpu_model", "GPU"),
+                "note":      getattr(device_profile, "gpu_note", ""),
+            }
+        else:
+            vulkan_info = detect_vulkan()
+            gpu_layers  = get_safe_gpu_layers(device_profile, vulkan_info)
     else:
         vulkan_info = {"available": use_vulkan, "gpu_type": "manual", "note": ""}
+        gpu_layers  = get_safe_gpu_layers(device_profile, vulkan_info)
 
-    gpu_layers = get_safe_gpu_layers(device_profile, vulkan_info)
     if gpu_layers > 0:
-        cmd += ["--gpu-layers", str(gpu_layers)]
+        # specs.py returns 999 as "offload everything" — safe for CUDA/Metal.
+        # For Vulkan builds the actual layer count depends on the model, so cap
+        # at 999 and let llama-cli clamp it internally (all modern builds do).
+        # If the binary is too old to accept --gpu-layers at all the IQ-quant
+        # guard above will have already set gpu_layers=0.
+        cmd += ["--gpu-layers", str(min(gpu_layers, 999))]
 
     return cmd, vulkan_info, gpu_layers
 
@@ -262,28 +313,51 @@ def launch_model(model_path, device_profile, system_prompt=None,
 
 def get_launch_summary(device_profile, model_name, variant_key,
                         vulkan_info=None, gpu_layers=0, mmap_active=False):
-    t = device_profile.get("optimal_threads", 2)
-    c = device_profile.get("safe_context",    1024)
-    b = device_profile.get("safe_batch",      128)
+    """
+    Return a human-readable launch settings summary.
 
+    v0.8: reads from DeviceProfile (new) or legacy dict.
+    Includes the GPU note explaining WHY acceleration is/isn't active,
+    so users on Android understand their Mali GPU is intentionally disabled.
+    """
+    if hasattr(device_profile, "threads"):
+        # New-style DeviceProfile
+        t = device_profile.threads
+        c = device_profile.ctx_size
+        b = device_profile.batch_size
+        gpu_note = getattr(device_profile, "gpu_note", "")
+        tier_str = f" ({getattr(device_profile, 'tier', '')} tier)" if hasattr(device_profile, "tier") else ""
+    else:
+        t = device_profile.get("optimal_threads", 2)
+        c = device_profile.get("safe_context",    1024)
+        b = device_profile.get("safe_batch",      128)
+        gpu_note  = ""
+        tier_str  = ""
+
+    # GPU line — always show WHY (Key Principle #5: Transparency)
     gpu_line = ""
     is_iq = variant_key.startswith("IQ")
     if is_iq:
-        gpu_line = f"\n  GPU     : CPU only — {variant_key} is Vulkan-incompatible"
+        gpu_line = f"\n  GPU     : CPU only — {variant_key} is incompatible with Vulkan/GPU"
     elif vulkan_info and vulkan_info.get("available") and gpu_layers > 0:
-        gpu_line = f"\n  GPU     : {vulkan_info['gpu_type']} · {gpu_layers} layers offloaded"
+        gpu_type = vulkan_info.get("gpu_type", "GPU")
+        gpu_line = f"\n  GPU     : {gpu_type} · {gpu_layers} layers offloaded"
     elif vulkan_info and not vulkan_info.get("available"):
-        gpu_line = f"\n  GPU     : CPU only ({vulkan_info.get('note', '')})"
+        note = vulkan_info.get("note", "") or gpu_note or "CPU only"
+        gpu_line = f"\n  GPU     : CPU only  ({note})"
 
-    mmap_line = "  mmap    : ON (model on internal storage — lower RAM usage)" if mmap_active \
-               else "  mmap    : OFF (external path or sdcard — safe mode)"
+    mmap_str  = "ON (model on internal storage — lower RAM usage)" if mmap_active                else "OFF (external path or Android sdcard)"
+    flash_str = ""
+    if hasattr(device_profile, "use_flash_attn") and device_profile.use_flash_attn:
+        flash_str = "\n  Flash   : ON (faster attention for CUDA/Metal)"
 
     return (
         f"  Model   : {model_name} ({variant_key})\n"
-        f"  Threads : {t} (auto-selected for your CPU)\n"
-        f"  Context : {c} tokens (safe for your RAM)\n"
-        f"  Batch   : {b} (tuned for low-end device)"
+        f"  Threads : {t} (auto-tuned for your CPU{tier_str})\n"
+        f"  Context : {c} tokens\n"
+        f"  Batch   : {b}"
         f"{gpu_line}\n"
-        f"  {mmap_line}\n"
+        f"  mmap    : {mmap_str}"
+        f"{flash_str}\n"
     )
-    
+

@@ -250,9 +250,24 @@ def download_model(model, device_profile, on_progress=None):
     print(f"  Variant : {variant_key}  (picked for {live_ram}GB RAM available)")
     print(f"  Size    : ~{variant.get('download_size_gb', '?')}GB")
     print(f"  Saving  : {dest_path}")
-    print("")
 
-    # Resume / already-downloaded check
+    # Warn if the chosen variant exceeds available RAM — smart_pick_variant
+    # falls back to the smallest option even when nothing actually fits.
+    min_ram = variant.get("min_ram_gb", 0)
+    if min_ram > 0 and live_ram > 0 and min_ram > live_ram:
+        print(f"\n  ⚠ WARNING: This variant needs {min_ram}GB RAM but only "
+              f"{live_ram}GB is available.")
+        print("  The model may crash or be killed mid-inference.")
+        print("  Consider closing other apps or choosing a smaller model.")
+        print(f"\n  Continue anyway? (y/N): ", end="")
+        try:
+            ans = input().strip().lower()
+        except (EOFError, KeyboardInterrupt):
+            ans = "n"
+        if ans != "y":
+            return False, "", "Download cancelled — insufficient RAM"
+
+    print("")
     remote_size = get_remote_file_size(url)
     local_size  = get_local_file_size(dest_path)
 

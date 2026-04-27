@@ -106,7 +106,19 @@ def get_local_catalog_version():
         return "0.0.0"
 
 
-def check_app_version(current_version):
+def _fetch_text_with_retry(url, timeout=15, retries=3):
+    """Fetch URL text with retry logic. Returns text or None after all attempts fail."""
+    for attempt in range(1, retries + 1):
+        result = _fetch_text(url, timeout=timeout)
+        if result is not None:
+            return result
+        if attempt < retries:
+            import time
+            time.sleep(2 * attempt)  # back-off: 2s, 4s
+    return None
+
+
+
     text = _fetch_text(VERSION_URL)
     if not text:
         return current_version, False
@@ -228,7 +240,7 @@ def run_self_update(current_version, verbose=True):
     p("  Checking GitHub for latest version...")
 
     # Step 1: Check version
-    remote_main = _fetch_text(VERSION_URL)
+    remote_main = _fetch_text_with_retry(VERSION_URL)
     if not remote_main:
         p(f"  {RED}✗ Could not reach GitHub. Check your connection.{RESET}")
         return "no_network"
@@ -319,7 +331,7 @@ def run_self_update(current_version, verbose=True):
             skipped_count += 1
             continue
 
-        content = _fetch_text(url, timeout=15)
+        content = _fetch_text_with_retry(url, timeout=15)
         if content is None:
             # Non-fatal — some files may not exist yet (new modules in future)
             if verbose:
