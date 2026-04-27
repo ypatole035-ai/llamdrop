@@ -25,6 +25,31 @@ except ImportError:
         LOW = "low"; MID = "mid"; HIGH = "high"
 
 
+# ── Tier hierarchy (matches specs.py Tier class) ──────────────────────────────
+
+TIER_ORDER = ["micro", "low", "low_mid", "mid", "high", "desktop", "workstation"]
+
+
+def _tier_index(tier_str):
+    """Return numeric index of a tier string, or 0 if unknown."""
+    try:
+        return TIER_ORDER.index(str(tier_str).lower())
+    except ValueError:
+        return 0
+
+
+def model_visible_for_device(model, device_tier):
+    """
+    Return True if this model should be shown for the given device tier.
+    Uses min_tier / max_tier fields from models.json.
+    Falls back to showing the model if fields are missing.
+    """
+    min_t = _tier_index(model.get("min_tier", "micro"))
+    max_t = _tier_index(model.get("max_tier", "workstation"))
+    current = _tier_index(device_tier)
+    return min_t <= current <= max_t
+
+
 # ── Load model catalog ────────────────────────────────────────────────────────
 
 def load_models(models_json_path=None):
@@ -56,14 +81,19 @@ def filter_models_for_device(models, device_profile):
     Also attaches the best variant and marks compatibility level.
     Works with both DeviceProfile dataclass and legacy dict profiles.
     """
-    avail_ram  = dp_ram_avail_gb(device_profile)
+    avail_ram   = dp_ram_avail_gb(device_profile)
+    device_tier = dp_tier(device_profile)
     # Give a small safety buffer
-    usable_ram = avail_ram - 0.5
+    usable_ram  = avail_ram - 0.5
 
     results = []
     for model in models:
-        # Filter purely by RAM — the max_tier field was unreliable and often
-        # hid perfectly valid models. RAM compatibility is the only real gate.
+        # Gate 1: tier range — hide models irrelevant for this device class.
+        # e.g. 135M models hidden on desktop, 70B models hidden on phones.
+        if not model_visible_for_device(model, device_tier):
+            continue
+
+        # Gate 2: RAM — only show models that can actually run
 
         # Find best variant for available RAM
         best_variant = None
@@ -127,9 +157,13 @@ COMPAT_LABELS = {
 }
 
 TIER_LABELS = {
-    1: "Ultra Low RAM",
-    2: "Standard",
-    3: "Better Hardware",
+    "micro":       "Micro  (<2GB)",
+    "low":         "Low  (2–4GB)",
+    "low_mid":     "Low-Mid  (4–6GB)",
+    "mid":         "Mid  (6–12GB)",
+    "high":        "High  (12–24GB)",
+    "desktop":     "Desktop  (24–64GB)",
+    "workstation": "Workstation  (64GB+)",
 }
 
 
@@ -137,14 +171,16 @@ def draw_header(stdscr, device_profile, width, category_label="All"):
     """Draw the top header bar with active category filter."""
     avail = dp_ram_avail_gb(device_profile)
     total = dp_ram_total_gb(device_profile)
-    chip  = dp_cpu_name(device_profile)[:25]
+    chip  = dp_cpu_name(device_profile)[:20]
+    tier  = dp_tier(device_profile)
+    tier_label = TIER_LABELS.get(tier, tier)
 
     title = " 🦙 llamdrop — Model Browser "
     stdscr.attron(curses.color_pair(1) | curses.A_BOLD)
     stdscr.addstr(0, 0, title.ljust(width)[:width])
     stdscr.attroff(curses.color_pair(1) | curses.A_BOLD)
 
-    specs = f" RAM: {avail}GB free / {total}GB  |  {chip}  |  Filter: {category_label} [C] "
+    specs = f" RAM: {avail}GB free / {total}GB  |  {chip}  |  {tier_label}  |  Filter: {category_label} [C] "
     stdscr.attron(curses.color_pair(2))
     stdscr.addstr(1, 0, specs.ljust(width)[:width])
     stdscr.attroff(curses.color_pair(2))
