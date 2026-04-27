@@ -1,6 +1,33 @@
 # llamdrop Changelog
 
-## v0.8.5 — Current
+## v0.8.6 — Current
+
+### Device-Aware Model Catalog & Browser
+
+**models.json — Expanded to full multi-device catalog**
+- Version bumped from `0.8` → `0.9`
+- Tier system expanded from 3 tiers (1/2/3) → 6 tiers mapped to `specs.py` Tier class: `micro / low / low_mid / mid / high / desktop / workstation`
+- Every model now carries `min_tier` and `max_tier` fields defining its relevant device range
+- `tier_order` array added to JSON root so filtering logic has a canonical hierarchy to reference
+- Model catalog expanded from 25 → 38 models — new additions cover mid-range to workstation:
+  - **Mid-range (low_mid → high):** Llama 3.1 8B, Qwen2.5 7B, Qwen2.5 Coder 7B, Gemma 3 12B, Qwen3 8B, Mistral NeMo 12B
+  - **High-end (mid → desktop):** Phi-4 14B, DeepSeek R1 Distill 14B, Qwen2.5 14B
+  - **Desktop (high → desktop):** Gemma 3 27B, Qwen3 32B, DeepSeek R1 Distill 32B, Qwen2.5 Coder 32B
+  - **Workstation (desktop → workstation):** Llama 3.3 70B, Qwen2.5 72B, DeepSeek R1 Distill 70B
+
+**browser.py — Tier-aware model filtering**
+- `TIER_ORDER` list added: `["micro", "low", "low_mid", "mid", "high", "desktop", "workstation"]`
+- `_tier_index()` helper converts tier string to comparable integer position
+- `model_visible_for_device()` added — returns True only if device tier falls within a model's `min_tier`/`max_tier` range
+- `filter_models_for_device()` now applies two gates in order:
+  - **Gate 1 (tier):** hides models irrelevant to the device class — tiny 135M models no longer shown on MacBook, 70B models no longer shown on phones
+  - **Gate 2 (RAM):** existing RAM + variant-picking logic unchanged
+- `TIER_LABELS` updated from old `{1: ..., 2: ..., 3: ...}` numeric keys to all 7 tier strings
+- `draw_header()` now shows device tier label in the browser header bar (e.g. `High (12–24GB)`) alongside RAM and chip info
+
+---
+
+## v0.8.5
 
 ### Bug Fixes
 - **`browser.py` content swap** — `browser.py` in the repo contained `benchmarks.py` content, causing `ImportError: cannot import name 'show_browser'` on every launch after updating. Correct file restored.
