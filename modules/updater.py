@@ -118,7 +118,8 @@ def _fetch_text_with_retry(url, timeout=15, retries=3):
     return None
 
 
-
+def check_app_version(current_version):
+    """Check GitHub for the latest app version. Returns (latest_version, is_newer)."""
     text = _fetch_text(VERSION_URL)
     if not text:
         return current_version, False
