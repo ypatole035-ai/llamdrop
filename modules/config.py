@@ -11,7 +11,7 @@ Example config.json:
   "threads": 4,
   "context_size": 2048,
   "batch_size": 256,
-  "max_tokens": 400,
+    "max_tokens": 512,
   "temperature": 0.7,
   "system_prompt": "You are a helpful assistant. Be concise.",
   "auto_save_sessions": true,
@@ -31,7 +31,7 @@ CONFIG_SCHEMA = {
     "threads":            {"type": int,   "default": None,  "min": 1,   "max": 32},
     "context_size":       {"type": int,   "default": None,  "min": 128, "max": 8192},
     "batch_size":         {"type": int,   "default": None,  "min": 32,  "max": 2048},
-    "max_tokens":         {"type": int,   "default": 300,   "min": 50,  "max": 2048},
+    "max_tokens":         {"type": int,   "default": 512,   "min": 50,  "max": 2048},
     "temperature":        {"type": float, "default": 0.7,   "min": 0.0, "max": 2.0},
     "system_prompt":      {"type": str,   "default": None},
     "auto_save_sessions": {"type": bool,  "default": True},
@@ -146,7 +146,7 @@ def create_default_config():
     os.makedirs(LLAMDROP_DIR, exist_ok=True)
     if not os.path.exists(CONFIG_FILE):
         default = {
-            "max_tokens":         300,
+            "max_tokens":         512,
             "temperature":        0.7,
             "auto_save_sessions": True,
             "warn_battery_below": 15,
@@ -209,7 +209,7 @@ def get_system_prompt():
 
 
 def get_max_tokens():
-    return get("max_tokens", 300)
+    return get("max_tokens", 512)
 
 
 def get_temperature():
