@@ -151,28 +151,49 @@ def get_downloaded_models():
     """
     Return GGUF files in ~/.llamdrop/models/ only.
     For the full phone scan, use get_all_gguf_files().
+
+    Bug fix: skips files under 50MB — these are partial/cancelled downloads.
+    A real GGUF model is never smaller than ~100MB. Showing a partial file
+    as a valid model causes llama-cli to crash on first message.
     """
+    # Partial files left by cancelled downloads are kept for resume support,
+    # but hidden from the model list. A sidecar .part file marks them clearly.
     models_dir = get_models_dir()
     result     = []
+    MIN_VALID_BYTES = 50 * 1024 * 1024  # 50MB — anything under this is a partial
     try:
         for fname in os.listdir(models_dir):
-            if fname.endswith(".gguf"):
-                fpath = os.path.join(models_dir, fname)
-                size  = os.path.getsize(fpath)
-                result.append({
-                    "filename": fname,
-                    "path":     fpath,
-                    "size_gb":  round(size / 1024**3, 2),
-                    "source":   "llamdrop",
-                })
+            if not fname.endswith(".gguf"):
+                continue
+            fpath = os.path.join(models_dir, fname)
+            size  = os.path.getsize(fpath)
+            if size < MIN_VALID_BYTES:
+                # Partial file — skip silently. Will be resumed on next download.
+                continue
+            result.append({
+                "filename": fname,
+                "path":     fpath,
+                "size_gb":  round(size / 1024**3, 2),
+                "source":   "llamdrop",
+            })
     except Exception:
         pass
     return result
 
 
-def model_is_downloaded(filename):
-    models_dir = get_models_dir()
-    return os.path.exists(os.path.join(models_dir, filename))
+def model_is_downloaded(filename, min_size_mb=50):
+    """
+    Returns True only if the file exists AND is large enough to be a complete model.
+
+    Bug fix: os.path.exists() alone returns True for partial/cancelled downloads.
+    The browser would show a green tick for a half-downloaded file, and selecting
+    it would crash llama-cli on the first message sent.
+    """
+    path = os.path.join(get_models_dir(), filename)
+    if not os.path.exists(path):
+        return False
+    size_mb = os.path.getsize(path) / (1024 * 1024)
+    return size_mb >= min_size_mb
 
 
 # ── File size check ───────────────────────────────────────────────────────────
@@ -350,7 +371,15 @@ def _download_with_wget(url, dest_path):
         else:
             return False, f"wget exited with code {result.returncode}"
     except KeyboardInterrupt:
-        print("\n\n  ⚠ Download interrupted. Run llamdrop again to resume.")
+        print("\n\n  ⚠ Download cancelled.")
+        # Delete the partial file — a half-written GGUF will crash llama-cli
+        # and silently appear as a valid model in the downloaded list.
+        if os.path.exists(dest_path):
+            try:
+                os.remove(dest_path)
+                print(f"  ✓ Partial file removed.")
+            except Exception:
+                print(f"  ⚠ Could not remove partial file — delete manually:\n    {dest_path}")
         return False, "interrupted"
     except Exception as e:
         return False, str(e)
@@ -406,11 +435,20 @@ def _download_with_urllib(url, dest_path, resume_from=0, total_size=0):
         return True, "ok"
 
     except KeyboardInterrupt:
-        print("\n\n  ⚠ Download interrupted. Run llamdrop again to resume.")
+        print("\n\n  ⚠ Download cancelled.")
+        # Delete the partial file — a half-written GGUF will crash llama-cli
+        # and silently appear as a valid model in the downloaded list.
+        if os.path.exists(dest_path):
+            try:
+                os.remove(dest_path)
+                print(f"  ✓ Partial file removed.")
+            except Exception:
+                print(f"  ⚠ Could not remove partial file — delete manually:\n    {dest_path}")
         return False, "interrupted"
     except urllib.error.URLError as e:
         return False, f"Network error: {e}"
     except Exception as e:
         return False, str(e)
+
 
   
