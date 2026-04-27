@@ -319,7 +319,10 @@ def show_device_info(device_profile, vulkan_info=None):
             print(c(YELLOW, f"  (specs.py error: {e} — falling back)\n"))
 
     # ── Legacy display (fallback) — works for both dict and DeviceProfile ────────
-    from specs import dp_ram_avail_gb, dp_ram_total_gb, dp_cpu_name, dp_threads, dp_ctx, dp_batch
+    try:
+        from specs import dp_ram_avail_gb, dp_ram_total_gb, dp_cpu_name, dp_threads, dp_ctx, dp_batch
+    except ImportError:
+        dp_ram_avail_gb = dp_ram_total_gb = dp_cpu_name = dp_threads = dp_ctx = dp_batch = None
 
     if hasattr(device_profile, "ram_total_gb"):
         # DeviceProfile dataclass
