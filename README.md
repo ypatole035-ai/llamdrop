@@ -65,6 +65,17 @@ That's it. Two commands. No compilation. No configuration. No account needed.
 
 ---
 
+## See it in Action 🦙
+
+<img src="https://github.com/ypatole035-ai/llamdrop/raw/main/docs/demo.gif" 
+     alt="llamdrop Demo on Android" 
+     width="620" 
+     style="max-width: 100%; height: auto; border: 1px solid #333; border-radius: 8px;">
+
+*A quick 15-second demo showing automatic device detection, smart model browser, download, and live chatting on a real budget Android phone.*
+
+---
+
 ## Features
 
 ### Device Intelligence
