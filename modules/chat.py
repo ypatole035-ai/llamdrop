@@ -674,6 +674,8 @@ def _run_inference(cmd, prompt, max_tokens=300, temperature=0.7):
         "--no-display-prompt",
         "--simple-io",
         "--temp",              str(round(temperature, 2)),
+        "--repeat-penalty",    "1.1",
+        "--repeat-last-n",     "64",
         "-co",                 "off",
     ]
 
