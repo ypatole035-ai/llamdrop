@@ -62,8 +62,15 @@ PROTECTED_PATHS = {
 
 def _fetch_text(url, timeout=10):
     try:
+        # Bust GitHub CDN cache so fresh pushes are seen immediately
+        cache_bust = f"{'&' if '?' in url else '?'}_={int(time.time())}"
         req = urllib.request.Request(
-            url, headers={"User-Agent": "llamdrop/0.5"}
+            url + cache_bust,
+            headers={
+                "User-Agent":    "llamdrop/0.5",
+                "Cache-Control": "no-cache",
+                "Pragma":        "no-cache",
+            }
         )
         with urllib.request.urlopen(req, timeout=timeout) as r:
             return r.read().decode("utf-8")
@@ -120,7 +127,7 @@ def _fetch_text_with_retry(url, timeout=15, retries=3):
 
 def check_app_version(current_version):
     """Check GitHub for the latest app version. Returns (latest_version, is_newer)."""
-    text = _fetch_text(VERSION_URL)
+    text = _fetch_text_with_retry(VERSION_URL)
     if not text:
         return current_version, False
     latest = _extract_version(text)
