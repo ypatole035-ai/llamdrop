@@ -287,7 +287,8 @@ def _dispatch_inference(cmd, prompt, max_tokens, temperature, device_profile,
 # ── Main chat loop ────────────────────────────────────────────────────────────
 
 def run_chat(cmd, model_name, device_profile, model_path=None, prompt_format='chatml',
-             initial_history=None, session_name=None, ollama_model=None):
+             initial_history=None, session_name=None, ollama_model=None,
+             file_context=None, file_context_name=None):
     """
     Launch llama-cli and manage the conversation loop.
 
@@ -299,6 +300,14 @@ def run_chat(cmd, model_name, device_profile, model_path=None, prompt_format='ch
     """
     history       = initial_history or []
     system_prompt = get_system_prompt()
+
+    # File context injection — focused mode
+    if file_context and file_context_name:
+        try:
+            from filecontext import build_file_system_prompt
+            system_prompt = build_file_system_prompt(system_prompt, file_context, file_context_name)
+        except ImportError:
+            pass  # filecontext.py not present — skip silently
     max_tokens    = get_max_tokens()
     temperature   = get_temperature()
 
@@ -315,7 +324,7 @@ def run_chat(cmd, model_name, device_profile, model_path=None, prompt_format='ch
             except (EOFError, KeyboardInterrupt):
                 return
 
-    _print_chat_header(model_name, device_profile)
+    _print_chat_header(model_name, device_profile, file_context_name=file_context_name)
 
     if not session_name:
         session_name = f"session_{time.strftime('%Y%m%d_%H%M%S')}"
@@ -859,7 +868,7 @@ def _export_chat(history, model_name):
         print(f"  ✗ Export failed: {e}")
 
 
-def _print_chat_header(model_name, device_profile):
+def _print_chat_header(model_name, device_profile, file_context_name=None):
     # Support both DeviceProfile dataclass (specs.py) and legacy dict
     if hasattr(device_profile, "ram_avail_gb"):
         avail = device_profile.ram_avail_gb
@@ -872,6 +881,9 @@ def _print_chat_header(model_name, device_profile):
     print("  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
     print(f"  🦙 Chat · {model_name}")
     print(f"  RAM: {avail}GB free · Context: {ctx} tokens")
+    if file_context_name:
+        import os as _os
+        print(f"  📎 Focused mode · {_os.path.basename(file_context_name)}")
     print("  Type /help for commands · Ctrl+C or /quit to exit")
     print("  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 

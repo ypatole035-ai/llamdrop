@@ -11,7 +11,7 @@ import curses
 import json
 import time
 
-VERSION = "0.8.4"
+VERSION = "0.8.5"
 
 # Ensure modules directory is on path
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -31,6 +31,12 @@ from downloader  import (download_model, get_downloaded_models,
 from launcher    import (find_llama_binary, llama_is_installed,
                           launch_model, get_launch_summary, detect_vulkan)
 from chat        import run_chat, list_sessions, load_session
+try:
+    from filecontext import prompt_for_file, build_file_system_prompt
+    _FILECONTEXT_OK = True
+except ImportError:
+    _FILECONTEXT_OK = False
+    def prompt_for_file(ctx_size): return None, None
 from hf_search   import search_hf_models
 from ram_monitor import ram_one_line, print_ram_dashboard, read_ram_full
 from updater     import run_background_update, get_pending_version_notice
@@ -905,10 +911,14 @@ def main():
                     device_profile, model_info["filename"], v_key,
                     v_info, 0, mmap_active=_mmap_on
                 ))
+                # File context — focused mode
+                _ctx_size = getattr(device_profile, "ctx_size", None) or (device_profile.get("safe_context", 2048) if hasattr(device_profile, "get") else 2048)
+                _file_content, _file_path = prompt_for_file(_ctx_size)
                 input(f"\n  Press Enter to start chatting...")
                 run_chat(cmd, model_info["filename"], device_profile,
                          model_path=model_info["path"],
-                         prompt_format=model_info.get("prompt_format", "chatml"))
+                         prompt_format=model_info.get("prompt_format", "chatml"),
+                         file_context=_file_content, file_context_name=_file_path)
 
         # 1 — Browse & download (verified catalog)
         elif choice == IDX_BROWSE:
@@ -970,10 +980,14 @@ def main():
                     model_info.get("_best_variant_key", "local"),
                     v_info, 0, mmap_active=_mmap_on
                 ))
+                # File context — focused mode
+                _ctx_size = getattr(device_profile, "ctx_size", None) or (device_profile.get("safe_context", 2048) if hasattr(device_profile, "get") else 2048)
+                _file_content, _file_path = prompt_for_file(_ctx_size)
                 input(f"\n  Press Enter to start chatting...")
                 run_chat(cmd, model_info["filename"], device_profile,
                          model_path=model_info["path"],
-                         prompt_format=model_info.get("prompt_format", "chatml"))
+                         prompt_format=model_info.get("prompt_format", "chatml"),
+                         file_context=_file_content, file_context_name=_file_path)
 
         # 4 — Resume session
         elif choice == IDX_RESUME:
