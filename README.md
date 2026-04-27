@@ -206,40 +206,6 @@ llamdrop/
 
 ## Roadmap
 
-### v0.3 — Done
-- [x] One-command install, no compilation
-- [x] Prebuilt binary download for Android
-- [x] Verified model catalog with tier system
-- [x] Live HuggingFace model search
-- [x] Resilient downloader with resume and retry
-- [x] Auto device detection + chip name translation
-- [x] Curses model browser UI
-- [x] Session save and resume
-- [x] Multi-language UI
-
-### v0.4 — Done
-- [x] Phone-wide GGUF scanner
-- [x] Smart quantization at download time
-- [x] Vulkan GPU acceleration
-- [x] Live RAM monitor during chat
-- [x] Context trimming (critical / low / post-inference)
-- [x] Animated thinking indicator
-- [x] Session delete
-- [x] 18 models in catalog
-
-### v0.5 — Done
-- [x] `llamdrop update` — self-update command
-- [x] `llamdrop doctor` — install health checker
-- [x] Model benchmarking — t/s scores in browser
-- [x] CHANGELOG.md
-
-### v0.6 — Done
-- [x] Prompt format auto-detect (chatml/llama3/gemma/phi3)
-- [x] Config file (`~/.llamdrop/config.json`)
-- [x] Chat export (`/export`)
-- [x] Battery monitoring
-- [x] Category filter in browser (C key)
-
 ### v0.7 — Done
 - [x] Chip-aware threads — 30+ chips mapped to actual big core count
 - [x] Fixed context thresholds — 2048–8192 tokens based on device class
