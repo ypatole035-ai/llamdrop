@@ -1,0 +1,89 @@
+name: Release Validation
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  validate-release:
+    name: Validate Release on All Platforms
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python-version: ["3.10", "3.11", "3.12"]
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Check syntax — all platforms
+        run: |
+          python -m py_compile llamdrop.py
+          python -m py_compile modules/device.py
+          python -m py_compile modules/browser.py
+          python -m py_compile modules/downloader.py
+          python -m py_compile modules/launcher.py
+          python -m py_compile modules/chat.py
+          python -m py_compile modules/ram_monitor.py
+          python -m py_compile modules/hf_search.py
+          python -m py_compile modules/i18n.py
+          python -m py_compile modules/updater.py
+          python -m py_compile modules/benchmarks.py
+          python -m py_compile modules/doctor.py
+          python -m py_compile modules/config.py
+          python -m py_compile modules/battery.py
+          python -m py_compile modules/filecontext.py
+          python -m py_compile modules/specs.py
+          python -m py_compile modules/backends/ollama.py
+          echo "All files syntax OK on ${{ matrix.os }} Python ${{ matrix.python-version }}"
+
+      - name: Validate models.json — all platforms
+        run: |
+          python -c "
+          import json, sys
+          with open('models.json') as f:
+              data = json.load(f)
+          assert len(data['models']) >= 40, f'Expected 40+ models, got {len(data[\"models\"])}'
+          print(f'Release OK: {len(data[\"models\"])} models, v{data[\"version\"]}')
+          "
+
+      - name: Verify VERSION matches release tag
+        run: |
+          python -c "
+          import re, os
+          with open('llamdrop.py') as f:
+              src = f.read()
+          match = re.search(r'VERSION\s*=\s*\"([^\"]+)\"', src)
+          assert match, 'VERSION not found in llamdrop.py'
+          version = match.group(1)
+          print(f'llamdrop.py VERSION = {version}')
+          # Get tag from env
+          tag = os.environ.get('GITHUB_REF_NAME', '')
+          if tag:
+              tag_clean = tag.lstrip('v')
+              if tag_clean != version:
+                  print(f'WARNING: Tag {tag} does not match VERSION {version}')
+              else:
+                  print(f'Version matches release tag: {tag}')
+          "
+
+  summary:
+    name: Release Summary
+    needs: validate-release
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Print result
+        run: |
+          if [ "${{ needs.validate-release.result }}" == "success" ]; then
+            echo "✅ All platform checks passed for this release."
+          else
+            echo "❌ One or more platform checks failed. Review the logs above."
+            exit 1
+          fi
+          
