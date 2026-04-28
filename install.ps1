@@ -1,6 +1,6 @@
 # llamdrop Windows Installer
 # https://github.com/ypatole035-ai/llamdrop
-# License: GPL v3 — Free forever. Cannot be sold.
+# License: GPL v3 - Free forever. Cannot be sold.
 #
 # Run in PowerShell (Windows 10/11):
 #   irm https://raw.githubusercontent.com/ypatole035-ai/llamdrop/main/install.ps1 | iex
@@ -14,24 +14,24 @@ $LLAMDROP_DIR = "$env:USERPROFILE\.llamdrop"
 $BIN_DIR      = "$LLAMDROP_DIR\bin"
 $LLAMA_RELEASE = "b8862"
 
-# ── Colours ───────────────────────────────────────────────────────────────────
+# -- Colours -------------------------------------------------------------------
 function Info   ($msg) { Write-Host "  [*] $msg" -ForegroundColor Cyan }
 function Success($msg) { Write-Host "  [OK] $msg" -ForegroundColor Green }
 function Warn   ($msg) { Write-Host "  [!] $msg"  -ForegroundColor Yellow }
 function Err    ($msg) { Write-Host "  [X] $msg"  -ForegroundColor Red }
 function Step   ($msg) { Write-Host "`n  -- $msg`n" -ForegroundColor Blue }
 
-# ── Banner ────────────────────────────────────────────────────────────────────
+# -- Banner --------------------------------------------------------------------
 function Show-Banner {
     Write-Host ""
-    Write-Host "  llamdrop — Run AI on any device." -ForegroundColor Blue
+    Write-Host "  llamdrop - Run AI on any device." -ForegroundColor Blue
     Write-Host "  Windows installer (PowerShell)`n" -ForegroundColor Cyan
-    Write-Host "  Free forever · GPL v3 · github.com/ypatole035-ai/llamdrop`n" -ForegroundColor Yellow
-    Write-Host "  " + ("━" * 54)
+    Write-Host "  Free forever . GPL v3 . github.com/ypatole035-ai/llamdrop`n" -ForegroundColor Yellow
+    Write-Host "  " + ("-" * 54)
     Write-Host ""
 }
 
-# ── Detect hardware ───────────────────────────────────────────────────────────
+# -- Detect hardware -----------------------------------------------------------
 function Detect-Hardware {
     Step "Detecting hardware"
 
@@ -40,7 +40,7 @@ function Detect-Hardware {
     $script:RAM_GB = [math]::Round($ramKB / 1GB)
     Info "RAM        : $script:RAM_GB GB"
 
-    # GPU — check NVIDIA first, then AMD, then Intel
+    # GPU - check NVIDIA first, then AMD, then Intel
     $script:GPU_VENDOR = "none"
     $script:GPU_NAME   = "None"
     $script:GPU_VRAM   = 0
@@ -83,7 +83,7 @@ function Detect-Hardware {
         Info "GPU        : $script:GPU_NAME ($script:GPU_VENDOR)"
         Info "GPU layers : $script:GPU_LAYERS (GPU acceleration enabled)"
     } else {
-        Warn "GPU        : No acceleratable GPU detected — CPU only"
+        Warn "GPU        : No acceleratable GPU detected - CPU only"
     }
 
     # Tier
@@ -97,7 +97,7 @@ function Detect-Hardware {
     Info "Tier       : $script:TIER ($script:RAM_GB GB RAM)"
 }
 
-# ── Check Python ──────────────────────────────────────────────────────────────
+# -- Check Python --------------------------------------------------------------
 function Check-Python {
     Step "Checking Python"
     $py = Get-Command python -ErrorAction SilentlyContinue
@@ -124,7 +124,7 @@ function Check-Python {
     Success "Python packages ready"
 }
 
-# ── Install llama.cpp binary ──────────────────────────────────────────────────
+# -- Install llama.cpp binary --------------------------------------------------
 function Install-LlamaCpp {
     Step "Installing llama.cpp"
 
@@ -187,7 +187,7 @@ function Install-LlamaCpp {
     Success "llama-cli.exe ready!"
 }
 
-# ── Install llamdrop scripts ───────────────────────────────────────────────────
+# -- Install llamdrop scripts ---------------------------------------------------
 function Install-LlamdropScripts {
     Step "Installing llamdrop scripts"
 
@@ -230,32 +230,32 @@ function Install-LlamdropScripts {
     New-Item -ItemType Directory -Force -Path $launcherDir | Out-Null
     $bat = "@echo off`r`npython `"$LLAMDROP_DIR\llamdrop.py`" %*"
     Set-Content "$launcherDir\llamdrop.bat" $bat
-    Success "Launcher created — run 'llamdrop' from any terminal"
+    Success "Launcher created - run 'llamdrop' from any terminal"
 }
 
-# ── Show model recommendations ────────────────────────────────────────────────
+# -- Show model recommendations ------------------------------------------------
 function Show-Recommendations {
     Step "Model recommendations for your device ($script:TIER tier, $script:RAM_GB GB RAM)"
 
     switch ($script:TIER) {
-        "micro"      { Write-Host "  Qwen3 0.5B Q4_K_M (~0.4GB) — only model that fits" -ForegroundColor Green }
-        "low"        { Write-Host "  Qwen3 1.7B Q4_K_M (~1.1GB) — best quality for your RAM" -ForegroundColor Green }
-        "low_mid"    { Write-Host "  Phi-4-mini 3.8B Q4_K_M (~2.5GB) — great quality, 68.5 MMLU" -ForegroundColor Green }
+        "micro"      { Write-Host "  Qwen3 0.5B Q4_K_M (~0.4GB) - only model that fits" -ForegroundColor Green }
+        "low"        { Write-Host "  Qwen3 1.7B Q4_K_M (~1.1GB) - best quality for your RAM" -ForegroundColor Green }
+        "low_mid"    { Write-Host "  Phi-4-mini 3.8B Q4_K_M (~2.5GB) - great quality, 68.5 MMLU" -ForegroundColor Green }
         "mid"        {
-            Write-Host "  1. Qwen3 4B Q4_K_M (~3.2GB) — excellent reasoning [recommended]" -ForegroundColor Green
-            Write-Host "  2. Phi-4-mini 3.8B Q4_K_M (~2.5GB) — slightly smaller, very capable" -ForegroundColor Cyan
+            Write-Host "  1. Qwen3 4B Q4_K_M (~3.2GB) - excellent reasoning [recommended]" -ForegroundColor Green
+            Write-Host "  2. Phi-4-mini 3.8B Q4_K_M (~2.5GB) - slightly smaller, very capable" -ForegroundColor Cyan
         }
         "high"       {
-            Write-Host "  1. Llama 3.1 8B Q4_K_M (~5.0GB) — solid all-rounder" -ForegroundColor Green
-            Write-Host "  2. DeepSeek R1 7B Q4_K_M (~4.7GB) — strong reasoning and math" -ForegroundColor Cyan
+            Write-Host "  1. Llama 3.1 8B Q4_K_M (~5.0GB) - solid all-rounder" -ForegroundColor Green
+            Write-Host "  2. DeepSeek R1 7B Q4_K_M (~4.7GB) - strong reasoning and math" -ForegroundColor Cyan
         }
         "desktop"    {
-            Write-Host "  1. Qwen3 14B Q4_K_M (~9GB) — step-up reasoning quality" -ForegroundColor Green
-            Write-Host "  2. Mistral Small 3 24B Q4_K_M (~15GB) — near-frontier" -ForegroundColor Cyan
+            Write-Host "  1. Qwen3 14B Q4_K_M (~9GB) - step-up reasoning quality" -ForegroundColor Green
+            Write-Host "  2. Mistral Small 3 24B Q4_K_M (~15GB) - near-frontier" -ForegroundColor Cyan
         }
         "workstation" {
-            Write-Host "  1. Qwen3 32B Q5_K_M (~24GB) — near-frontier reasoning" -ForegroundColor Green
-            Write-Host "  2. Llama 3.3 70B Q4_K_M (~43GB) — best open-source" -ForegroundColor Cyan
+            Write-Host "  1. Qwen3 32B Q5_K_M (~24GB) - near-frontier reasoning" -ForegroundColor Green
+            Write-Host "  2. Llama 3.3 70B Q4_K_M (~43GB) - best open-source" -ForegroundColor Cyan
         }
     }
 
@@ -266,14 +266,14 @@ function Show-Recommendations {
 
     if ($script:GPU_VENDOR -ne "none" -and $script:GPU_VENDOR -ne "intel_mac" -and $script:GPU_USABLE) {
         Write-Host ""
-        Write-Host "  GPU: $script:GPU_NAME — acceleration ENABLED (gpu-layers = 999)" -ForegroundColor Green
+        Write-Host "  GPU: $script:GPU_NAME - acceleration ENABLED (gpu-layers = 999)" -ForegroundColor Green
     }
 }
 
-# ── Finish ────────────────────────────────────────────────────────────────────
+# -- Finish --------------------------------------------------------------------
 function Show-Finish {
     Write-Host ""
-    Write-Host "  " + ("━" * 54) -ForegroundColor Blue
+    Write-Host "  " + ("-" * 54) -ForegroundColor Blue
     Write-Host ""
     Success "llamdrop installed!"
     Write-Host ""
@@ -286,7 +286,7 @@ function Show-Finish {
     Write-Host ""
 }
 
-# ── Main ──────────────────────────────────────────────────────────────────────
+# -- Main ----------------------------------------------------------------------
 Show-Banner
 Detect-Hardware
 Check-Python
