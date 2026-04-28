@@ -683,10 +683,19 @@ def _build_assistant_turn(assistant_content, prompt_format="chatml"):
 # ── Noise filter (shared between inference and display) ──────────────────────
 
 _NOISE = (
-    "llama_memory", "load_backend", "Exiting",
+    "llama_memory", "load_backend",
     "llama_", "ggml_", "build :", "model :",
     "modalities :", "available commands", "/exit", "/regen",
     "/clear", "/read", "/glob", "[ Prompt:",
+)
+
+# Lines that are always llama.cpp meta output — filtered everywhere in the
+# response, not just at the top. These are never part of a model's answer.
+_META_LINES = (
+    "[ Prompt:",       # timing stats line
+    "Exiting",         # llama-cli exit message
+    "llama_print_timings",
+    "main: llama_",
 )
 
 _PROMPT_MARKERS = [
@@ -702,29 +711,22 @@ def _extract_response(raw_output):
     """
     Extract the model's response from raw llama-cli stdout.
 
-    llama-cli echoes the full prompt then generates the response.
-    We find the first prompt-echo marker and take everything after it.
+    With -p flag, llama-cli output structure is:
+      [optional banner if --log-disable not respected]
+      <prompt_marker>
+      <response text>
+      [ Prompt: X t/s | Generation: Y t/s ]   ← timing stats
+      Exiting...                               ← exit message
 
-    Noise filtering strategy (two-zone):
-    - BEFORE the marker: apply _NOISE filter to strip llama.cpp startup lines
-      (build info, available commands, /exit, /regen etc.) that leak into stdout
-      when --no-display-prompt doesn't fully suppress them on some builds.
-    - AFTER the marker: no noise filtering at all — this is the model's actual
-      response. Filtering it risks silently deleting real content (code output,
-      log analysis) that happens to start with a noise prefix.
+    Strategy:
+    - Find the prompt marker and take everything after it
+    - Strip _NOISE lines before the response starts (banner leakage)
+    - Strip _META_LINES (timing stats, Exiting) anywhere they appear —
+      these are always llama.cpp output, never model response content
+    - Strip chatml boundary tags
+    - Do NOT apply broad noise filtering to actual response content
 
-    If no marker is found at all, apply noise filtering to the whole output
-    so the llama.cpp splash (build hash, model info, available commands) doesn't
-    print through to the user as if it were a model response.
-
-    Bug #14 fix: use str.partition() on the FIRST marker match instead of
-    split()[-1]. split(marker)[-1] cuts on every occurrence of the marker
-    string in the output — if a model emits the marker string inside its own
-    response the tail gets silently truncated. partition() only splits on the
-    first hit which is always the prompt-echo, so generated text that contains
-    the same string is preserved.
-
-    Returns clean_response string.
+    If no marker found, noise-filter the whole output.
     """
     marker_found = False
     response_text = raw_output
@@ -736,37 +738,45 @@ def _extract_response(raw_output):
             break
 
     if not marker_found:
-        # No prompt marker — apply noise filter to the whole output to strip
-        # llama.cpp startup lines (build hash, available commands, etc.)
-        # before showing anything to the user.
         lines = []
         for line in raw_output.splitlines():
             s = line.rstrip()
             if not s:
                 continue
+            if any(s.startswith(p) for p in _META_LINES):
+                break  # stop at stats line — nothing after is response content
             if any(s.startswith(p) for p in _NOISE):
                 continue
             lines.append(s)
         return "\n".join(lines).strip()
 
-    # Marker found — response_text is pure model output, don't noise-filter it.
-    # Exception: on some llama.cpp builds the banner (build info, available
-    # commands) leaks into stdout AFTER the prompt marker. Strip _NOISE lines
-    # that appear before the first non-noise, non-empty line so they don't
-    # show up at the top of the response. Once real content starts, stop
-    # filtering — we don't want to touch the model's actual output.
+    # Marker found — process the response section
     lines = []
     response_started = False
     for line in response_text.splitlines():
         s = line.rstrip()
+
+        # Always skip blank lines before response starts
         if not s:
             if response_started:
                 lines.append(s)
             continue
+
+        # Always strip chatml boundary tags
         if "<|im_start|>" in s or "<|im_end|>" in s:
             continue
+
+        # Always strip llama.cpp meta lines — timing stats, Exiting, etc.
+        # These appear AFTER the response text. Once we hit one, stop —
+        # anything after is repeated output or llama.cpp bookkeeping,
+        # not model response content.
+        if any(s.startswith(p) for p in _META_LINES):
+            break
+
+        # Strip banner lines that appear before the response starts
         if not response_started and any(s.startswith(p) for p in _NOISE):
-            continue  # strip banner lines before response starts
+            continue
+
         response_started = True
         lines.append(s)
 
