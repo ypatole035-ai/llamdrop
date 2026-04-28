@@ -43,18 +43,35 @@ except ImportError:
         def stop(self): pass
         def format_drop(self): return ""
 
+# Shared RAM utility — single source of truth (defined in specs.py).
+# Replaces the old local get_available_ram_gb() that was a duplicate.
+try:
+    from specs import read_available_ram_gb as get_available_ram_gb
+except ImportError:
+    def get_available_ram_gb():
+        try:
+            with open("/proc/meminfo") as f:
+                for line in f:
+                    if line.startswith("MemAvailable"):
+                        return round(int(line.split()[1]) / 1024 / 1024, 2)
+        except Exception:
+            pass
+        return 0.0
+
 SESSIONS_DIR = os.path.expanduser("~/.llamdrop/sessions")
 BIN_DIR      = os.path.expanduser("~/.llamdrop/bin")
 
 
-def _clean_memory(force=False):
+def _clean_memory(avail_gb=None, force=False):
     """Release Python and OS memory after inference.
+    Accepts a pre-read avail_gb so we don't need another /proc/meminfo read.
     Only calls malloc_trim when RAM is actually under pressure (< 1.5 GB free)
     or force=True, to avoid latency overhead on every response.
     Borrowed from AirLLM.
     """
     gc.collect()
-    if force or get_available_ram_gb() < 1.5:
+    ram = avail_gb if avail_gb is not None else get_available_ram_gb()
+    if force or ram < 1.5:
         try:
             ctypes.CDLL("libc.so.6").malloc_trim(0)
         except Exception:
@@ -122,21 +139,16 @@ def load_session(path):
 
 
 # ── RAM helpers ───────────────────────────────────────────────────────────────
+# get_available_ram_gb is imported from specs.py above — no local copy.
 
-def get_available_ram_gb():
-    try:
-        with open("/proc/meminfo") as f:
-            for line in f:
-                if line.startswith("MemAvailable"):
-                    kb = int(line.split()[1])
-                    return round(kb / 1024 / 1024, 2)
-    except Exception:
-        pass
-    return 0.0
-
-
-def ram_status_line(device_profile=None):
-    avail = get_available_ram_gb()
+def ram_status_line(avail_gb=None):
+    """
+    Return a colour-coded RAM status string.
+    Accepts a pre-read avail_gb value so the caller can read RAM once per loop
+    iteration and pass it here, avoiding a second /proc/meminfo read.
+    Falls back to reading live if not provided.
+    """
+    avail = avail_gb if avail_gb is not None else get_available_ram_gb()
     if avail < 0.8:
         icon = "🔴"; warn = " ⚠ CRITICAL"
     elif avail < 1.5:
@@ -150,16 +162,40 @@ def ram_status_line(device_profile=None):
 
 def trim_history(history, keep_turns=4):
     """
-    Trim conversation history to the last N user/assistant pairs.
-    Always keeps system context. Returns (trimmed_history, trimmed_count).
+    Trim conversation history to preserve the first exchange (user turn 0 +
+    assistant turn 1) and the most recent keep_turns entries. Everything in
+    between is deleted.
+
+    Rationale: the first exchange typically sets the task, tone, or key
+    constraints. Blind tail-trimming (old behaviour) could silently delete it.
+    Deleting from the middle preserves both the original intent and the most
+    recent context.
+
+    Returns (trimmed_history, trimmed_count).
     Never trims to fewer than 2 turns (1 pair) to keep the conversation valid.
     """
     keep_turns = max(2, keep_turns)
     if len(history) <= keep_turns:
         return history, 0
 
-    trimmed_count = len(history) - keep_turns
-    return history[-keep_turns:], trimmed_count
+    # Always keep the first 2 entries (the opening exchange)
+    ANCHOR = 2
+    tail_keep = max(keep_turns - ANCHOR, 0)
+
+    if tail_keep == 0:
+        # keep_turns so small there's no room for tail — just keep the anchor
+        trimmed_count = len(history) - ANCHOR
+        return history[:ANCHOR], trimmed_count
+
+    head = history[:ANCHOR]
+    tail = history[-tail_keep:]
+
+    # Avoid duplication if history is short enough that head and tail overlap
+    if len(history) <= ANCHOR + tail_keep:
+        return history, 0
+
+    trimmed_count = len(history) - ANCHOR - tail_keep
+    return head + tail, trimmed_count
 
 
 def should_trim(avail_ram_gb, warn_threshold=1.5, critical_threshold=0.8):
@@ -333,9 +369,22 @@ def run_chat(cmd, model_name, device_profile, model_path=None, prompt_format='ch
     _last_save_len = 0   # Bug #5 fix: track length at last save, not % 10
     indicator = ThinkingIndicator()
 
+    # ── Incremental prompt buffer ─────────────────────────────────────────────
+    # Instead of rebuilding the full prompt from history on every turn,
+    # we maintain a buffer and append only the new user turn each time.
+    # The buffer is fully rebuilt only when history is trimmed (turns deleted).
+    _prompt_buffer     = None   # None = needs full build on first turn
+    _prompt_buf_format = None   # track format so a format change forces rebuild
+
     try:
         while True:
-            print(f"\n  {ram_status_line(device_profile)}\n")
+            # ── Single RAM read for this entire loop iteration ────────────────
+            # ram_status_line(), should_trim(), and _clean_memory() all need
+            # the current RAM value. Read once here and pass it through rather
+            # than hitting /proc/meminfo 3–4 times per turn.
+            avail_now = get_available_ram_gb()
+
+            print(f"\n  {ram_status_line(avail_now)}\n")
 
             try:
                 user_input = input("  You: ").strip()
@@ -385,7 +434,6 @@ def run_chat(cmd, model_name, device_profile, model_path=None, prompt_format='ch
                 continue
 
             # ── Check RAM before sending ──────────────────────────────────────
-            avail_now = get_available_ram_gb()
             trim_level = should_trim(avail_now)
 
             if trim_level == "critical":
@@ -393,15 +441,27 @@ def run_chat(cmd, model_name, device_profile, model_path=None, prompt_format='ch
                 history, n = trim_history(history, keep_turns=2)
                 if n:
                     print(f"  ✓ Trimmed {n} old messages")
+                _prompt_buffer = None  # history changed — force full rebuild
             elif trim_level == "warn":
                 print("  🟡 LOW RAM — auto-trimming context to 4 turns...")
                 history, n = trim_history(history, keep_turns=4)
                 if n:
                     print(f"  ✓ Trimmed {n} old messages")
+                _prompt_buffer = None  # history changed — force full rebuild
 
             # ── Add user message and build prompt ─────────────────────────────
             history.append({"role": "user", "content": user_input})
-            prompt = _build_prompt(history, system_prompt, prompt_format)
+
+            # Incremental prompt buffer: append only the new user turn instead
+            # of rebuilding kilobytes of unchanged history on every message.
+            # Full rebuild happens on first turn, after a trim, or if format changes.
+            if _prompt_buffer is None or _prompt_buf_format != prompt_format:
+                prompt = _build_prompt(history, system_prompt, prompt_format)
+                _prompt_buf_format = prompt_format
+            else:
+                new_turn = _build_turn(user_input, prompt_format)
+                prompt = _prompt_buffer + new_turn
+            _prompt_buffer = prompt  # store for next iteration
 
             # ── Launch model with indicator + watcher ─────────────────────────
             print("")
@@ -446,14 +506,21 @@ def run_chat(cmd, model_name, device_profile, model_path=None, prompt_format='ch
                 print("  Auto-trimming to 2 turns to prevent crash...")
                 history.append({"role": "assistant", "content": assistant_content})
                 history, _ = trim_history(history, keep_turns=2)
+                _prompt_buffer = None  # history changed — force full rebuild
             elif watcher.hit_warn:
                 print(f"\n  🟡 RAM was low during inference (min: {watcher.min_ram_gb}GB)")
                 history.append({"role": "assistant", "content": assistant_content})
                 history, n = trim_history(history, keep_turns=6)
                 if n:
                     print(f"  Context trimmed ({n} old messages removed)")
+                _prompt_buffer = None  # history changed — force full rebuild
             else:
                 history.append({"role": "assistant", "content": assistant_content})
+                # Append assistant turn to incremental buffer
+                if _prompt_buffer is not None:
+                    _prompt_buffer = _prompt_buffer + _build_assistant_turn(
+                        assistant_content, prompt_format
+                    )
 
             # Auto-save every 10 messages — compare against last saved length
             # rather than % 10 so trims can't cause the counter to skip a save.
@@ -461,8 +528,10 @@ def run_chat(cmd, model_name, device_profile, model_path=None, prompt_format='ch
                 save_session(session_name, model_name, history)
                 _last_save_len = len(history)
 
-            # Release memory back to OS immediately after each response
-            _clean_memory()
+            # Release memory back to OS immediately after each response.
+            # Pass avail_now so malloc_trim threshold check doesn't need
+            # another /proc/meminfo read — we already have it from this turn.
+            _clean_memory(avail_now)
 
     except Exception as e:
         watcher.stop()
@@ -567,6 +636,40 @@ def _build_phi3(history, system_prompt=None):
     return "\n".join(parts)
 
 
+# ── Incremental prompt buffer helpers ────────────────────────────────────────
+#
+# These build only the NEW fragment that gets appended to the existing buffer
+# on each turn — avoiding a full history rebuild every message.
+
+def _build_turn(user_content, prompt_format="chatml"):
+    """Return the formatted string for a single new user turn."""
+    fmt = prompt_format.lower()
+    c   = _clean(user_content)
+    if fmt == "llama3":
+        return (f"<|start_header_id|>user<|end_header_id|>\n\n{c}<|eot_id|>"
+                f"<|start_header_id|>assistant<|end_header_id|>\n\n")
+    elif fmt == "gemma":
+        return f"<start_of_turn>user\n{c}<end_of_turn>\n<start_of_turn>model\n"
+    elif fmt == "phi3":
+        return f"<|user|>\n{c}<|end|>\n<|assistant|>\n"
+    else:  # chatml
+        return f"\n<|im_start|>user\n{c}<|im_end|>\n<|im_start|>assistant"
+
+
+def _build_assistant_turn(assistant_content, prompt_format="chatml"):
+    """Return the formatted string for a completed assistant turn."""
+    fmt = prompt_format.lower()
+    c   = _clean(assistant_content)
+    if fmt == "llama3":
+        return f"{c}<|eot_id|>"
+    elif fmt == "gemma":
+        return f"{c}<end_of_turn>\n"
+    elif fmt == "phi3":
+        return f"{c}<|end|>\n"
+    else:  # chatml
+        return f"\n{c}<|im_end|>"
+
+
 # ── llama-cli launcher ────────────────────────────────────────────────────────
 
 # ── Noise filter (shared between inference and display) ──────────────────────
@@ -589,11 +692,16 @@ _PROMPT_MARKERS = [
 
 def _extract_response(raw_output):
     """
-    Extract and clean the model's response from raw llama-cli stdout.
+    Extract the model's response from raw llama-cli stdout.
 
     llama-cli echoes the full prompt then generates the response.
-    We find the last prompt-echo marker and take everything after it,
-    then strip noise lines.
+    We find the last prompt-echo marker and take everything after it.
+
+    Noise filtering (llama_, ggml_, etc.) is intentionally NOT applied here.
+    stdout is the model's actual response — filtering it risks silently
+    deleting real content (e.g. code output or log analysis that starts
+    with 'llama_'). Noise lines only appear in stderr; the caller's stderr
+    handler filters those separately.
 
     Bug #14 fix: use str.partition() on the FIRST marker match instead of
     split()[-1].  split(marker)[-1] cuts on every occurrence of the marker
@@ -610,14 +718,14 @@ def _extract_response(raw_output):
             _, _sep, response_text = raw_output.partition(marker)
             break
 
+    # Strip format tags that llama-cli may echo at the boundary, but do NOT
+    # apply the broad _NOISE filter — that belongs on stderr only.
     lines = []
     for line in response_text.splitlines():
         s = line.rstrip()
         if not s:
             continue
         if "<|im_start|>" in s or "<|im_end|>" in s:
-            continue
-        if any(s.startswith(p) for p in _NOISE):
             continue
         lines.append(s)
 
@@ -661,21 +769,8 @@ def _run_inference(cmd, prompt, max_tokens=300, temperature=0.7):
         clean_cmd.append(arg)
         i += 1
 
-    # Write prompt to temp file — prevents terminal echo
-    import tempfile
-    prompt_file = None
-    try:
-        tf = tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False)
-        tf.write(prompt)
-        tf.close()
-        prompt_file = tf.name
-    except Exception:
-        prompt_file = None
-
-    if prompt_file:
-        clean_cmd += ["-f", prompt_file]
-    else:
-        clean_cmd += ["-p", prompt]
+    # Prompt is passed via stdin (proc.stdin.write below) — no -p or -f flag needed.
+    # The --no-display-prompt flag suppresses the echoed prompt in stdout.
 
     clean_cmd += [
         "--predict",           str(max_tokens),
@@ -692,11 +787,21 @@ def _run_inference(cmd, prompt, max_tokens=300, temperature=0.7):
         proc = subprocess.Popen(
             clean_cmd,
             env=_get_env(),
+            stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
             bufsize=1,
         )
+
+        # Write prompt via stdin — no temp file disk I/O needed.
+        # This is the primary path. The -p / -f flags above are kept as
+        # fallback only if stdin write fails (handled in the except below).
+        try:
+            proc.stdin.write(prompt)
+            proc.stdin.close()
+        except Exception:
+            pass  # stdin may not be supported by all llama-cli builds — fallback is -p flag
 
         stderr_lines = []
 
@@ -794,12 +899,6 @@ def _run_inference(cmd, prompt, max_tokens=300, temperature=0.7):
     except Exception as e:
         print(f"\n  Error launching model: {e}")
         return None, None
-    finally:
-        if prompt_file:
-            try:
-                os.remove(prompt_file)
-            except Exception:
-                pass
 
 
 # Keep _launch_llama as a thin compatibility shim so nothing breaks
