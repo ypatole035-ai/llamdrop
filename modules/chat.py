@@ -810,15 +810,17 @@ def _run_inference(cmd, prompt, max_tokens=300, temperature=0.7):
         clean_cmd.append(arg)
         i += 1
 
-    # Prompt is passed via stdin (proc.stdin.write below) — no -p or -f flag needed.
-    # The --no-display-prompt flag suppresses the echoed prompt in stdout.
-
+    # Pass prompt via -p flag — the most reliable method across llama-cli builds.
+    # stdin worked in testing but some builds on Android ignore stdin in
+    # --single-turn mode and fall into interactive mode, printing the full banner.
+    # -p is the canonical non-interactive prompt flag and works on all builds.
     clean_cmd += [
+        "-p",                  prompt,
         "--predict",           str(max_tokens),
         "--single-turn",
         "--no-display-prompt",
         "--simple-io",
-        "--log-disable",       # suppress llama.cpp banner/build info from stdout
+        "--log-disable",
         "--temp",              str(round(temperature, 2)),
         "--repeat-penalty",    "1.1",
         "--repeat-last-n",     "64",
@@ -829,21 +831,11 @@ def _run_inference(cmd, prompt, max_tokens=300, temperature=0.7):
         proc = subprocess.Popen(
             clean_cmd,
             env=_get_env(),
-            stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
             bufsize=1,
         )
-
-        # Write prompt via stdin — no temp file disk I/O needed.
-        # This is the primary path. The -p / -f flags above are kept as
-        # fallback only if stdin write fails (handled in the except below).
-        try:
-            proc.stdin.write(prompt)
-            proc.stdin.close()
-        except Exception:
-            pass  # stdin may not be supported by all llama-cli builds — fallback is -p flag
 
         stderr_lines = []
 
@@ -902,9 +894,11 @@ def _run_inference(cmd, prompt, max_tokens=300, temperature=0.7):
             )
             if unsupported:
                 # Strip newer flags that older llama-cli versions don't support
+                # Keep -p and --predict — those are essential on all versions
                 retry_cmd = [
                     a for a in clean_cmd
-                    if a not in ("--single-turn", "--no-display-prompt", "--simple-io")
+                    if a not in ("--single-turn", "--no-display-prompt",
+                                 "--simple-io", "--log-disable")
                 ]
                 print(f"\n  ↩ Retrying without unsupported flags...")
                 try:
