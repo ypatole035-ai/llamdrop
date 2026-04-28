@@ -56,6 +56,7 @@ jobs:
         run: |
           # Add modules to path and check key imports work
           $env:PYTHONPATH = "modules"
+          $env:PYTHONUTF8 = "1"
           # Check syntax of all py files
           $failed = 0
           Get-ChildItem -Recurse -Filter "*.py" | ForEach-Object {
@@ -77,6 +78,6 @@ jobs:
 
       - name: Check llamdrop.py VERSION on Windows
         run: |
-          python -c "f=open('llamdrop.py'); lines=[l for l in f if l.startswith('VERSION')]; print('Version:', lines[0].strip()) if lines else print('VERSION not found')"
+          python -c "f=open('llamdrop.py',encoding='utf-8'); lines=[l for l in f if l.startswith('VERSION')]; print('Version:', lines[0].strip()) if lines else print('VERSION not found')"
         shell: powershell
         
