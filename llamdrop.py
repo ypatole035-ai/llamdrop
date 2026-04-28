@@ -11,7 +11,7 @@ import curses
 import json
 import time
 
-VERSION = "0.8.7"
+VERSION = "0.8.6"
 
 # Ensure modules directory is on path
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -599,7 +599,7 @@ def show_help():
     print(c(BOLD, "  Tips:\n"))
     print("  • Close other apps before chatting to free up RAM")
     print("  • If the model crashes, try a smaller model or Tier 1")
-    print("  • llamdrop auto-saves every 5 exchanges")
+    print("  • llamdrop auto-saves every 5 exchanges (10 messages)")
     print("  • Context is trimmed automatically when RAM gets low")
     print("  • Use 'My downloaded models' to find GGUFs already on your phone")
     print("")
