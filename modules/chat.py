@@ -703,31 +703,54 @@ def _extract_response(raw_output):
     Extract the model's response from raw llama-cli stdout.
 
     llama-cli echoes the full prompt then generates the response.
-    We find the last prompt-echo marker and take everything after it.
+    We find the first prompt-echo marker and take everything after it.
 
-    Noise filtering (llama_, ggml_, etc.) is intentionally NOT applied here.
-    stdout is the model's actual response — filtering it risks silently
-    deleting real content (e.g. code output or log analysis that starts
-    with 'llama_'). Noise lines only appear in stderr; the caller's stderr
-    handler filters those separately.
+    Noise filtering strategy (two-zone):
+    - BEFORE the marker: apply _NOISE filter to strip llama.cpp startup lines
+      (build info, available commands, /exit, /regen etc.) that leak into stdout
+      when --no-display-prompt doesn't fully suppress them on some builds.
+    - AFTER the marker: no noise filtering at all — this is the model's actual
+      response. Filtering it risks silently deleting real content (code output,
+      log analysis) that happens to start with a noise prefix.
+
+    If no marker is found at all, apply noise filtering to the whole output
+    so the llama.cpp splash (build hash, model info, available commands) doesn't
+    print through to the user as if it were a model response.
 
     Bug #14 fix: use str.partition() on the FIRST marker match instead of
-    split()[-1].  split(marker)[-1] cuts on every occurrence of the marker
-    string in the output — if a Gemma model happens to emit "<start_of_turn>model"
-    inside its own response the tail gets silently truncated.  partition() only
-    splits on the first hit, which is always the prompt-echo, so generated text
-    that contains the same string is preserved.
+    split()[-1]. split(marker)[-1] cuts on every occurrence of the marker
+    string in the output — if a model emits the marker string inside its own
+    response the tail gets silently truncated. partition() only splits on the
+    first hit which is always the prompt-echo, so generated text that contains
+    the same string is preserved.
 
     Returns clean_response string.
     """
+    marker_found = False
     response_text = raw_output
+
     for marker in _PROMPT_MARKERS:
         if marker in raw_output:
             _, _sep, response_text = raw_output.partition(marker)
+            marker_found = True
             break
 
-    # Strip format tags that llama-cli may echo at the boundary, but do NOT
-    # apply the broad _NOISE filter — that belongs on stderr only.
+    if not marker_found:
+        # No prompt marker — apply noise filter to the whole output to strip
+        # llama.cpp startup lines (build hash, available commands, etc.)
+        # before showing anything to the user.
+        lines = []
+        for line in raw_output.splitlines():
+            s = line.rstrip()
+            if not s:
+                continue
+            if any(s.startswith(p) for p in _NOISE):
+                continue
+            lines.append(s)
+        return "\n".join(lines).strip()
+
+    # Marker found — response_text is pure model output, don't noise-filter it.
+    # Only strip format boundary tags that llama-cli echoes at the seam.
     lines = []
     for line in response_text.splitlines():
         s = line.rstrip()
