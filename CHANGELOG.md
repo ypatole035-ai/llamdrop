@@ -1,38 +1,54 @@
 # llamdrop Changelog
 
-## v0.8.7 — Current
+## v0.8.8 — Current
 
-### Under the hood — performance and correctness cleanup
+### Under the hood — downloader and startup cleanup
 
-No new features in this release. Everything here is an existing feature working smarter or faster.
+No new features. Two existing things work better.
 
-**Startup is faster**
+**The "My Models" scan no longer freezes the screen**
 
-llamdrop was running its full hardware detection routine three separate times every time it launched — once to build the device profile, once for the first-run welcome screen, and once for the GPU check. Each run fired off subprocess calls to `getprop`, `lspci`, `nvidia-smi`, and friends. Now it runs exactly once and reuses the result everywhere. On slower devices this is a noticeable improvement.
+When you opened the My Downloaded Models screen, llamdrop was walking through your storage directories — Downloads, Documents, sdcard — on the main thread. On slow Android storage or folders with lots of files, the app would freeze with a static `Scanning...` message and no feedback. The scan now runs in the background while a live counter updates on screen (`Scanning... 3 found`). The UI stays responsive the whole time.
+
+**Auto-save intent is now explicit in the code**
+
+The auto-save threshold was a magic number `10` buried in the chat loop with a comment that said "every 10 messages" — but it was actually counting both user and assistant turns, so it saved every 5 exchanges, not 10. The number is now a named constant `_AUTOSAVE_EVERY_TURNS = 10` with a clear explanation, and the help text was updated to match: "auto-saves every 5 exchanges (10 messages)".
+
+---
+
+## v0.8.7
+
+### Under the hood — chat, browser, and RAM improvements
+
+No new features. Existing features working smarter and faster.
+
+**Startup runs hardware detection once instead of three times**
+
+llamdrop was running its full hardware detection routine three separate times on every launch — once for the main profile, once for the first-run welcome screen, and once for the GPU check. Each run fired subprocess calls to `getprop`, `lspci`, `nvidia-smi`, and friends. Now it runs exactly once and the result is passed through everywhere. On slower devices this is a noticeable improvement.
+
+**RAM reads consolidated to one shared function**
+
+`/proc/meminfo` was being read independently in `specs.py`, `chat.py`, and `downloader.py` with slightly different implementations. There is now one shared `read_available_ram_gb()` in `specs.py` that the other modules import. Inside the chat loop, RAM is read once per turn and passed through to every function that needs it instead of each reading it separately.
 
 **Chatting with long conversations is faster**
 
-Every time you sent a message, llamdrop was rebuilding the entire conversation prompt from scratch — looping through all 20, 30, 40 turns and re-serialising kilobytes of unchanged text. Now it keeps an incremental buffer and appends only the new turn. The full rebuild only happens when context is trimmed (since turns were deleted).
+Every time you sent a message, llamdrop was rebuilding the entire conversation prompt from scratch — looping through all turns and re-serialising kilobytes of unchanged text. Now it keeps an incremental buffer and appends only the new turn. Full rebuild only happens when context is trimmed.
 
 **Context trimming is smarter**
 
-When RAM gets low and llamdrop needs to shorten the conversation, it used to cut from the tail — keeping only the last N turns. That meant it could silently delete the opening exchange where you set up the task, the persona, or the key constraints. Now it always keeps the first exchange and the most recent turns, deleting from the middle instead. Your original intent is preserved.
+When RAM gets low and llamdrop shortens the conversation, it used to cut from the tail — keeping only the last N turns. That could silently delete the opening exchange where you set up the task or persona. Now it always keeps the first exchange and the most recent turns, deleting from the middle. Your original intent is preserved.
 
 **Prompts no longer touch the disk on Android**
 
-On every single message, llamdrop was writing the full prompt to a temporary file on flash storage, then deleting it after inference. On Android with slow storage this was unnecessary I/O on every response. The prompt is now passed via stdin instead — no disk write, no cleanup.
+On every message, llamdrop was writing the full prompt to a temporary file on flash storage then deleting it after inference. The prompt is now passed via stdin instead — no disk write, no cleanup on every response.
 
 **Model responses can no longer be silently corrupted**
 
-llamdrop was applying a noise filter (lines starting with `llama_`, `ggml_`, etc.) to the model's stdout output. If a model produced a real response that happened to contain one of those prefixes — a code snippet, a log file, a debug output — that line was silently deleted. The noise filter now only applies to stderr, which is where the actual noise comes from. Stdout is passed through untouched.
+llamdrop was applying a noise filter (lines starting with `llama_`, `ggml_`, etc.) to the model's stdout. If a model produced a real response containing one of those prefixes — a code snippet, a log file — that line was silently deleted. The noise filter now only applies to stderr where the actual noise comes from. Stdout is passed through untouched.
 
 **Category switching in the model browser is now instant**
 
-Pressing C to filter models by category (chat, coding, reasoning, etc.) was re-running the full device compatibility check on every keypress — re-evaluating tier gates, RAM gates, and variant picking across all 38 models. Now the compatibility check runs once when the browser opens and the result is cached. Category switching is a simple in-memory slice with no repeated RAM reads.
-
-**RAM reads consolidated**
-
-`/proc/meminfo` was being read independently in three different places — `specs.py`, `chat.py`, and `downloader.py` — with slightly different implementations. There is now one shared `read_available_ram_gb()` function in `specs.py` that the other modules import. Inside the chat loop, RAM is read once per turn and the value is passed through to every function that needs it instead of each reading it separately.
+Pressing C to filter by category was re-running the full device compatibility check on every keypress — tier gates, RAM gates, variant picking across all 38 models. The check now runs once when the browser opens and the result is cached. Category switching is a plain in-memory slice with no repeated RAM reads.
 
 ---
 
