@@ -750,14 +750,24 @@ def _extract_response(raw_output):
         return "\n".join(lines).strip()
 
     # Marker found — response_text is pure model output, don't noise-filter it.
-    # Only strip format boundary tags that llama-cli echoes at the seam.
+    # Exception: on some llama.cpp builds the banner (build info, available
+    # commands) leaks into stdout AFTER the prompt marker. Strip _NOISE lines
+    # that appear before the first non-noise, non-empty line so they don't
+    # show up at the top of the response. Once real content starts, stop
+    # filtering — we don't want to touch the model's actual output.
     lines = []
+    response_started = False
     for line in response_text.splitlines():
         s = line.rstrip()
         if not s:
+            if response_started:
+                lines.append(s)
             continue
         if "<|im_start|>" in s or "<|im_end|>" in s:
             continue
+        if not response_started and any(s.startswith(p) for p in _NOISE):
+            continue  # strip banner lines before response starts
+        response_started = True
         lines.append(s)
 
     return "\n".join(lines).strip()
@@ -784,7 +794,7 @@ def _run_inference(cmd, prompt, max_tokens=300, temperature=0.7):
     """
     # Strip interactive/log flags that may be in cmd from launcher
     strip_flags     = {"-i", "--interactive", "--interactive-first",
-                       "--no-interactive", "--color", "--log-disable"}
+                       "--no-interactive", "--color"}
     strip_with_value = {"-n", "--predict", "--n-predict"}
 
     clean_cmd = []
@@ -808,6 +818,7 @@ def _run_inference(cmd, prompt, max_tokens=300, temperature=0.7):
         "--single-turn",
         "--no-display-prompt",
         "--simple-io",
+        "--log-disable",       # suppress llama.cpp banner/build info from stdout
         "--temp",              str(round(temperature, 2)),
         "--repeat-penalty",    "1.1",
         "--repeat-last-n",     "64",
