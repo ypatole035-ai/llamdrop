@@ -1,0 +1,66 @@
+name: macOS Installer Test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  release:
+    types: [published]
+
+jobs:
+  test-macos-installer:
+    name: Test install.sh on macOS
+    runs-on: macos-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Check install.sh syntax on macOS bash
+        run: |
+          bash -n install.sh && echo "install.sh syntax OK on macOS"
+
+      - name: Run device detection on macOS
+        run: |
+          export PYTHONPATH=modules
+          python3 -c "
+          import sys
+          sys.path.insert(0, 'modules')
+          try:
+              from specs import build_device_profile
+              profile = build_device_profile()
+              print('Device profile OK on macOS')
+              print(f'  Platform : {profile.platform}')
+              print(f'  RAM total: {profile.ram_total_gb} GB')
+              print(f'  Tier     : {profile.tier}')
+              print(f'  Backend  : {profile.backend}')
+              # On macOS, backend should be ollama or llama.cpp metal
+              print(f'  mac_chip : {profile.mac_chip}')
+          except Exception as e:
+              print(f'Error: {e}')
+              import traceback; traceback.print_exc()
+              sys.exit(1)
+          "
+
+      - name: Validate models.json on macOS
+        run: |
+          python3 -c "
+          import json
+          with open('models.json') as f:
+              data = json.load(f)
+          print(f'models.json OK — {len(data[\"models\"])} models')
+          "
+
+      - name: Check all Python syntax on macOS
+        run: |
+          failed=0
+          for f in llamdrop.py modules/*.py modules/backends/*.py; do
+            python3 -m py_compile "$f" && echo "OK: $f" || { echo "FAIL: $f"; failed=1; }
+          done
+          exit $failed
+          
