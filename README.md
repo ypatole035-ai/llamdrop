@@ -235,7 +235,7 @@ llamdrop/
 - [x] RAM estimate overhead raised to 1.4× for KV cache accuracy
 - [x] Multiple critical bug fixes (browser.py content swap, blocking stdout, config cache, auto-save counter, menu index offsets, Vulkan false positives)
 
-     FOR CURRENT VERSION UPDATES BETWEEN v0.8 and v0.9 check [CHANGELOG] (CHANGELOG.md)
+     FOR CURRENT VERSION UPDATES BETWEEN v0.8 and v0.9 check [CHANGELOG](CHANGELOG.md)
 
 ### v0.9 — Next
 - [ ] Web-based model catalog (GitHub Pages)
