@@ -1,6 +1,19 @@
 # llamdrop Changelog
 
-## v0.8.9 — Current
+## v0.9.0 — current
+
+### Stability release — all fixes from v0.8.6 through v0.8.9
+
+- Chat output pipeline fully cleaned: no banner bleed, no duplicate responses, no leaked meta lines
+- Model browser is now device-aware — shows only models that fit your hardware
+- Catalog expanded from 38 to 41 models
+- Background model scanning — UI no longer freezes on My Models screen
+- RAM reads consolidated, startup hardware detection runs once instead of three times
+- Smarter context trimming — preserves first exchange when shortening history
+
+---
+
+## v0.8.9 
 
 ### Chat output fixes — banner, duplicate responses, and leaked meta lines
 
