@@ -1,0 +1,82 @@
+name: 🦙 New Model Request
+description: Suggest a model to add to the llamdrop catalog
+labels: ["model-request"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Want a model added to the verified catalog? llamdrop's catalog only includes models that are:
+        - In GGUF format and downloadable from HuggingFace **without login**
+        - Free to use (`license_allows_free_use: true`)
+        - Confirmed to run on ≤8GB RAM devices
+        
+        If you've tested it yourself, that's a huge bonus — it can go straight in.
+
+  - type: input
+    id: model_name
+    attributes:
+      label: Model name
+      description: Exact name from HuggingFace
+      placeholder: e.g. Qwen/Qwen2.5-0.5B-Instruct-GGUF
+    validations:
+      required: true
+
+  - type: input
+    id: hf_url
+    attributes:
+      label: HuggingFace URL
+      placeholder: https://huggingface.co/...
+    validations:
+      required: true
+
+  - type: dropdown
+    id: license
+    attributes:
+      label: License
+      description: Is this model free to use without restriction?
+      options:
+        - "Yes — Apache 2.0 / MIT / similar permissive"
+        - "Yes — Llama community license (free for most uses)"
+        - "Unsure"
+        - "No / restricted"
+    validations:
+      required: true
+
+  - type: input
+    id: min_ram
+    attributes:
+      label: Minimum RAM required (from your testing or model card)
+      placeholder: e.g. ~2GB for Q4_K_M
+    validations:
+      required: true
+
+  - type: dropdown
+    id: tested
+    attributes:
+      label: Have you personally tested this model?
+      options:
+        - "Yes — tested and it runs stably"
+        - "Yes — tested but had some issues"
+        - "No — I haven't tested it yet"
+    validations:
+      required: true
+
+  - type: input
+    id: test_device
+    attributes:
+      label: Device you tested on (if applicable)
+      placeholder: e.g. Redmi 9, Helio G85, 3GB RAM, Android 11
+
+  - type: textarea
+    id: why
+    attributes:
+      label: Why should this be in the catalog?
+      description: What makes this model useful for llamdrop's target users? (low-end, budget, constrained hardware)
+    validations:
+      required: true
+
+  - type: textarea
+    id: notes
+    attributes:
+      label: Additional notes
+      description: Quantization variants worth including, known quirks, context window size, etc.

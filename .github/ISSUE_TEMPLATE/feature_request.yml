@@ -1,0 +1,61 @@
+name: 💡 Feature Request
+description: Suggest something new or an improvement
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Got an idea? llamdrop started as a one-person frustration project — good ideas from users have already shaped it.
+        
+        Keep in mind the project's constraints: **no unnecessary dependencies, Python 3.8+ compatible, must work on low-end hardware.**
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: What area does this relate to?
+      options:
+        - Model browser / catalog
+        - Download / installation
+        - Chat / inference
+        - Device detection / specs
+        - UI / terminal experience
+        - Platform support (new OS or device type)
+        - Translations / language support
+        - Performance / RAM usage
+        - Something else
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem does this solve?
+      description: Describe the situation where this would help. Who is affected?
+      placeholder: e.g. "On Android with 3GB RAM, the model list shows things I can't run and I have to scroll a lot to find what fits..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: suggestion
+    attributes:
+      label: What would you like to see?
+      description: Describe your idea. It doesn't need to be a complete spec — a rough idea is fine.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: hardware_context
+    attributes:
+      label: What hardware are you on?
+      description: Helps evaluate if this applies to low-end devices or all devices
+      options:
+        - Low-end (≤3GB RAM) — Android or SBC
+        - Mid-range (4–6GB RAM)
+        - Higher-end (8GB+ RAM)
+        - All hardware
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Have you tried any workarounds?
+      description: Optional — anything you currently do to get around the missing feature

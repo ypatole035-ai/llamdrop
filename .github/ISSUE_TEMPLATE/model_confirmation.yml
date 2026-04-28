@@ -1,0 +1,97 @@
+name: ✅ Model Confirmation
+description: Report that a model works (or doesn't) on your device
+labels: ["model-testing"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Confirmed a model works on your device? This is one of the most valuable contributions you can make.
+        Your report helps other users on similar hardware know what to expect.
+
+  - type: input
+    id: model_name
+    attributes:
+      label: Model name
+      description: Exact model name as shown in the llamdrop catalog or HuggingFace
+      placeholder: e.g. Qwen2.5-1.5B-Instruct-Q4_K_M
+    validations:
+      required: true
+
+  - type: dropdown
+    id: result
+    attributes:
+      label: Result
+      options:
+        - ✅ Works — ran stably
+        - ⚠️ Works with issues (describe below)
+        - ❌ Does not work
+    validations:
+      required: true
+
+  - type: input
+    id: device
+    attributes:
+      label: Device name and chipset
+      description: e.g. "Samsung Galaxy A52, Snapdragon 720G" or "Raspberry Pi 5, Cortex-A76"
+      placeholder: Device name, chipset
+    validations:
+      required: true
+
+  - type: input
+    id: ram
+    attributes:
+      label: Total RAM
+      description: e.g. "4GB"
+      placeholder: e.g. 4GB
+    validations:
+      required: true
+
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Platform
+      options:
+        - Android (Termux)
+        - Linux
+        - Raspberry Pi / SBC
+        - macOS
+        - Windows
+        - Other
+    validations:
+      required: true
+
+  - type: input
+    id: llamdrop_version
+    attributes:
+      label: llamdrop version
+      placeholder: e.g. v0.9.1
+    validations:
+      required: true
+
+  - type: input
+    id: speed
+    attributes:
+      label: Approximate speed (tokens/second)
+      description: Shown in llamdrop after a chat exchange, or visible in the benchmark screen
+      placeholder: e.g. ~4.2 t/s
+
+  - type: dropdown
+    id: backend
+    attributes:
+      label: Backend used
+      description: Shown during model load
+      options:
+        - CPU only
+        - Vulkan (Adreno)
+        - Vulkan (Mali)
+        - Vulkan (AMD desktop)
+        - CUDA (NVIDIA)
+        - Metal / Ollama (Apple Silicon)
+        - Ollama (Linux/desktop)
+        - Not sure
+
+  - type: textarea
+    id: notes
+    attributes:
+      label: Notes
+      description: Any quirks, crashes, quality issues, or tips for other users on similar hardware

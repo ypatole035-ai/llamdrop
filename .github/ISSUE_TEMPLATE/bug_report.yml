@@ -1,0 +1,109 @@
+name: 🐛 Bug Report
+description: Something crashed, froze, or behaved unexpectedly
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report this. The more detail you provide, the faster it gets fixed.
+        
+        **Tip:** Run `llamdrop` and go to **System Info / Doctor** — it will show your device specs in one place.
+
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Platform
+      description: What are you running llamdrop on?
+      options:
+        - Android (Termux)
+        - Linux (PC / laptop)
+        - Raspberry Pi / SBC
+        - macOS
+        - Windows
+        - Other (describe below)
+    validations:
+      required: true
+
+  - type: input
+    id: device
+    attributes:
+      label: Device name and chipset
+      description: e.g. "Redmi Note 11, Snapdragon 680" or "Raspberry Pi 4B, Cortex-A72"
+      placeholder: Device name, chipset
+    validations:
+      required: true
+
+  - type: input
+    id: ram
+    attributes:
+      label: Total RAM and free RAM when the issue occurred
+      description: e.g. "4GB total, ~1.2GB free"
+      placeholder: e.g. 4GB total, ~1.2GB free
+    validations:
+      required: true
+
+  - type: input
+    id: os_version
+    attributes:
+      label: OS version
+      description: e.g. "Android 13", "Raspbian Bookworm", "Ubuntu 22.04", "Windows 11"
+      placeholder: e.g. Android 13 / Ubuntu 22.04
+    validations:
+      required: true
+
+  - type: input
+    id: llamdrop_version
+    attributes:
+      label: llamdrop version
+      description: Shown on startup or in Settings. e.g. "v0.9.1"
+      placeholder: e.g. v0.9.1
+    validations:
+      required: true
+
+  - type: dropdown
+    id: where
+    attributes:
+      label: Where did the issue happen?
+      options:
+        - On launch / startup
+        - During install
+        - Model browser / downloading a model
+        - During chat / inference
+        - My Models screen
+        - Device profiling / specs detection
+        - Settings / configuration
+        - Other (describe below)
+    validations:
+      required: true
+
+  - type: input
+    id: model
+    attributes:
+      label: Model involved (if any)
+      description: Which model were you trying to use or download?
+      placeholder: e.g. Qwen2.5-0.5B-Q4_K_M
+
+  - type: textarea
+    id: what_happened
+    attributes:
+      label: What happened?
+      description: Describe the bug clearly. What did you do, what did you expect, and what went wrong?
+      placeholder: |
+        1. I opened llamdrop
+        2. I selected model X
+        3. It crashed with this error...
+    validations:
+      required: true
+
+  - type: textarea
+    id: error_message
+    attributes:
+      label: Error message or output
+      description: Paste the exact error text here. Even a partial error message is helpful.
+      render: shell
+
+  - type: textarea
+    id: extra
+    attributes:
+      label: Anything else?
+      description: GPU type, backend used (Vulkan / CUDA / CPU), Termux version, or other context that might help.
