@@ -1,0 +1,121 @@
+name: Code Check
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  syntax-and-imports:
+    name: Python Syntax & Import Check
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Check syntax on all Python files
+        run: |
+          echo "Checking syntax..."
+          failed=0
+          for f in llamdrop.py modules/*.py modules/backends/*.py; do
+            if python3 -m py_compile "$f"; then
+              echo "  OK: $f"
+            else
+              echo "  FAIL: $f"
+              failed=1
+            fi
+          done
+          exit $failed
+
+      - name: Validate models.json
+        run: |
+          python3 -c "
+          import json, sys
+          with open('models.json') as f:
+              data = json.load(f)
+
+          assert 'models' in data, 'Missing models key'
+          assert 'version' in data, 'Missing version key'
+          assert isinstance(data['models'], list), 'models must be a list'
+          assert len(data['models']) > 0, 'models list is empty'
+
+          required_keys = ['id', 'name', 'tier', 'hf_repo', 'variants']
+          for i, m in enumerate(data['models']):
+              for k in required_keys:
+                  assert k in m, f'Model {i} missing key: {k}'
+              assert isinstance(m['variants'], dict), f'Model {m[\"id\"]}: variants must be a dict'
+              assert len(m['variants']) > 0, f'Model {m[\"id\"]}: no variants defined'
+
+          print(f'models.json OK — {len(data[\"models\"])} models, version {data[\"version\"]}')
+          "
+
+      - name: Check cross-module imports resolve
+        run: |
+          python3 -c "
+          import ast, os, sys
+
+          def get_defined(path):
+              with open(path) as f:
+                  tree = ast.parse(f.read())
+              return {n.name for n in ast.walk(tree)
+                      if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))}
+
+          modules = {
+              'device':     'modules/device.py',
+              'browser':    'modules/browser.py',
+              'downloader': 'modules/downloader.py',
+              'launcher':   'modules/launcher.py',
+              'chat':       'modules/chat.py',
+              'hf_search':  'modules/hf_search.py',
+              'ram_monitor':'modules/ram_monitor.py',
+              'updater':    'modules/updater.py',
+              'i18n':       'modules/i18n.py',
+              'filecontext':'modules/filecontext.py',
+              'doctor':     'modules/doctor.py',
+          }
+
+          required = {
+              'device':     ['get_device_profile', 'format_profile_summary', 'get_full_profile'],
+              'browser':    ['show_browser', 'run_browser'],
+              'downloader': ['download_model', 'get_downloaded_models', 'get_all_gguf_files', 'model_is_downloaded', 'smart_pick_variant'],
+              'launcher':   ['find_llama_binary', 'llama_is_installed', 'launch_model', 'get_launch_summary', 'detect_vulkan'],
+              'chat':       ['run_chat', 'list_sessions', 'load_session'],
+              'hf_search':  ['search_hf_models'],
+              'ram_monitor':['ram_one_line', 'print_ram_dashboard', 'read_ram_full'],
+              'updater':    ['run_self_update'],
+              'i18n':       ['load_language', 't', 'save_language', 'choose_language_menu'],
+              'filecontext':['prompt_for_file', 'build_file_system_prompt'],
+              'doctor':     ['run_doctor'],
+          }
+
+          failed = 0
+          for mod, funcs in required.items():
+              defined = get_defined(modules[mod])
+              for fn in funcs:
+                  if fn in defined:
+                      print(f'  OK: {mod}.{fn}')
+                  else:
+                      print(f'  MISSING: {mod}.{fn}')
+                      failed += 1
+
+          sys.exit(failed)
+          "
+
+      - name: Check VERSION string exists
+        run: |
+          python3 -c "
+          with open('llamdrop.py') as f:
+              src = f.read()
+          assert 'VERSION = ' in src, 'VERSION string missing from llamdrop.py'
+          # Extract and print it
+          for line in src.splitlines():
+              if line.startswith('VERSION'):
+                  print('Found:', line)
+                  break
+          "
