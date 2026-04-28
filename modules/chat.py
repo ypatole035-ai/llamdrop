@@ -366,6 +366,12 @@ def run_chat(cmd, model_name, device_profile, model_path=None, prompt_format='ch
         session_name = f"session_{time.strftime('%Y%m%d_%H%M%S')}"
 
     watcher        = _InferenceRamWatcher()
+    # _AUTOSAVE_EVERY_TURNS: how many history entries (user + assistant combined)
+    # must accumulate since the last save before auto-saving again.
+    # 10 entries = 5 exchanges (each exchange adds 1 user + 1 assistant entry).
+    # Named constant here so the intent is explicit and easy to change without
+    # hunting for a magic number buried in the loop.
+    _AUTOSAVE_EVERY_TURNS = 10
     _last_save_len = 0   # Bug #5 fix: track length at last save, not % 10
     indicator = ThinkingIndicator()
 
@@ -522,9 +528,11 @@ def run_chat(cmd, model_name, device_profile, model_path=None, prompt_format='ch
                         assistant_content, prompt_format
                     )
 
-            # Auto-save every 10 messages — compare against last saved length
-            # rather than % 10 so trims can't cause the counter to skip a save.
-            if len(history) - _last_save_len >= 10:
+            # Auto-save check — use named constant so intent is clear.
+            # _AUTOSAVE_EVERY_TURNS counts both user + assistant entries,
+            # so 10 = 5 exchanges. Compare against last saved length rather
+            # than % 10 so trims can't cause the counter to skip a save.
+            if len(history) - _last_save_len >= _AUTOSAVE_EVERY_TURNS:
                 save_session(session_name, model_name, history)
                 _last_save_len = len(history)
 
