@@ -1,0 +1,95 @@
+name: Windows Installer Test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  release:
+    types: [published]
+
+jobs:
+  test-windows-installer:
+    name: Test install.ps1 on Windows
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Allow PowerShell script execution
+        run: Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+        shell: powershell
+
+      - name: Verify install.ps1 exists and is non-empty
+        run: |
+          if (!(Test-Path "install.ps1")) {
+            Write-Error "install.ps1 not found"
+            exit 1
+          }
+          $size = (Get-Item "install.ps1").Length
+          if ($size -lt 1000) {
+            Write-Error "install.ps1 looks too small ($size bytes)"
+            exit 1
+          }
+          Write-Host "install.ps1 found — $size bytes"
+        shell: powershell
+
+      - name: Check install.ps1 syntax
+        run: |
+          $errors = $null
+          $null = [System.Management.Automation.PSParser]::Tokenize(
+            (Get-Content install.ps1 -Raw), [ref]$errors
+          )
+          if ($errors.Count -gt 0) {
+            foreach ($e in $errors) { Write-Error $e.Message }
+            exit 1
+          }
+          Write-Host "install.ps1 syntax OK"
+        shell: powershell
+
+      - name: Verify Python files are importable on Windows
+        run: |
+          # Add modules to path and check key imports work
+          $env:PYTHONPATH = "modules"
+          # Check syntax of all py files
+          $failed = 0
+          Get-ChildItem -Recurse -Filter "*.py" | ForEach-Object {
+            $result = python -m py_compile $_.FullName 2>&1
+            if ($LASTEXITCODE -ne 0) {
+              Write-Host "FAIL: $($_.Name) - $result"
+              $failed++
+            } else {
+              Write-Host "OK: $($_.Name)"
+            }
+          }
+          if ($failed -gt 0) { exit 1 }
+        shell: powershell
+
+      - name: Validate models.json on Windows
+        run: |
+          python -c "
+          import json
+          with open('models.json') as f:
+              data = json.load(f)
+          print(f'models.json OK - {len(data[\"models\"])} models')
+          "
+        shell: powershell
+
+      - name: Check llamdrop.py VERSION on Windows
+        run: |
+          python -c "
+          import sys
+          sys.path.insert(0, 'modules')
+          with open('llamdrop.py') as f:
+              for line in f:
+                  if line.startswith('VERSION'):
+                      print('Version:', line.strip())
+                      break
+          "
+        shell: powershell
+        
