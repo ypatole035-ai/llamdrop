@@ -1,6 +1,18 @@
 # llamdrop Changelog
 
-## v0.9.0 — current
+## v0.9.1 — current
+
+### Windows CI — automated installer validation
+
+- Windows GitHub Actions workflow now runs on every push to main
+- PowerShell installer (`install.ps1`) is validated for existence, size, and syntax automatically
+- All Python source files are syntax-checked on a real Windows runner via `py_compile`
+- `models.json` and `llamdrop.py` VERSION are verified on Windows on every commit
+- Fixed Unicode characters in `install.ps1` that caused PowerShell tokenizer failures (`—`, `─`, `━`, `·` replaced with ASCII equivalents)
+- Fixed Windows Python encoding — `PYTHONUTF8=1` and explicit `encoding='utf-8'` on all file reads, preventing `cp1252` codec errors
+- No more manual Windows testing needed for installer and syntax validation
+
+## v0.9.0
 
 ### Stability release — all fixes from v0.8.6 through v0.8.9
 
