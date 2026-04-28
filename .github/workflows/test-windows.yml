@@ -72,25 +72,11 @@ jobs:
 
       - name: Validate models.json on Windows
         run: |
-          python -c "
-          import json
-          with open('models.json') as f:
-              data = json.load(f)
-          print(f'models.json OK - {len(data[\"models\"])} models')
-          "
+          python -c "import json; data=json.load(open('models.json')); count=len(data['models']); print('models.json OK -', count, 'models')"
         shell: powershell
 
       - name: Check llamdrop.py VERSION on Windows
         run: |
-          python -c "
-          import sys
-          sys.path.insert(0, 'modules')
-          with open('llamdrop.py') as f:
-              for line in f:
-                  if line.startswith('VERSION'):
-                      print('Version:', line.strip())
-                      break
-          "
+          python -c "f=open('llamdrop.py'); lines=[l for l in f if l.startswith('VERSION')]; print('Version:', lines[0].strip()) if lines else print('VERSION not found')"
         shell: powershell
-
         
