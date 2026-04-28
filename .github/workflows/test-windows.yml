@@ -80,4 +80,5 @@ jobs:
         run: |
           python -c "f=open('llamdrop.py',encoding='utf-8'); lines=[l for l in f if l.startswith('VERSION')]; print('Version:', lines[0].strip()) if lines else print('VERSION not found')"
         shell: powershell
+
         
