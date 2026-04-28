@@ -13,8 +13,31 @@ v0.4 changes:
 import os
 import json
 import subprocess
+import threading
 import urllib.request
 import urllib.error
+
+# Shared RAM utility — single source of truth (defined in specs.py, Phase 1).
+# Replaces the old local _get_live_ram_gb() that was a duplicate.
+try:
+    from specs import read_available_ram_gb as _get_live_ram_gb
+except ImportError:
+    def _get_live_ram_gb():
+        try:
+            mem = {}
+            with open("/proc/meminfo") as f:
+                for line in f:
+                    parts = line.split()
+                    if len(parts) >= 2:
+                        mem[parts[0].rstrip(":")] = int(parts[1])
+            avail_kb     = mem.get("MemAvailable", 0)
+            swap_free_kb = mem.get("SwapFree", 0)
+            avail_gb     = round(avail_kb / 1024 / 1024, 2)
+            swap_gb      = round(min(swap_free_kb, 1536 * 1024) / 1024 / 1024, 1)
+            return round(avail_gb + swap_gb * 0.6, 2)
+        except Exception:
+            pass
+        return 0.0
 
 
 HF_BASE = "https://huggingface.co"
@@ -42,28 +65,6 @@ def get_models_dir():
     models_dir   = os.path.join(llamdrop_dir, "models")
     os.makedirs(models_dir, exist_ok=True)
     return models_dir
-
-
-# ── Live RAM helper ───────────────────────────────────────────────────────────
-
-def _get_live_ram_gb():
-    """Read current available RAM in GB, including swap/zram contribution."""
-    try:
-        mem = {}
-        with open("/proc/meminfo") as f:
-            for line in f:
-                parts = line.split()
-                if len(parts) >= 2:
-                    mem[parts[0].rstrip(":")] = int(parts[1])
-        avail_kb    = mem.get("MemAvailable", 0)
-        swap_free_kb = mem.get("SwapFree", 0)
-        avail_gb    = round(avail_kb / 1024 / 1024, 2)
-        # Add capped swap contribution (max 1.5GB, weighted 0.6)
-        swap_gb     = round(min(swap_free_kb, 1536 * 1024) / 1024 / 1024, 1)
-        return round(avail_gb + swap_gb * 0.6, 2)
-    except Exception:
-        pass
-    return 0.0
 
 
 # ── Smart variant picker ──────────────────────────────────────────────────────
@@ -118,31 +119,62 @@ def get_all_gguf_files():
     Scan common storage paths for .gguf files the user may already have.
     Returns list of dicts: [{filename, path, size_gb}]
     Deduplicates by path.
-    """
-    found = {}
 
-    for base in SCAN_PATHS:
-        if not os.path.isdir(base):
-            continue
-        try:
-            for fname in os.listdir(base):
-                if not fname.lower().endswith(".gguf"):
-                    continue
-                fpath = os.path.join(base, fname)
-                if fpath in found:
-                    continue
-                try:
-                    size = os.path.getsize(fpath)
-                    found[fpath] = {
-                        "filename": fname,
-                        "path":     fpath,
-                        "size_gb":  round(size / 1024**3, 2),
-                        "source":   "scan",  # distinguish from ~/.llamdrop/models
-                    }
-                except Exception:
-                    pass
-        except Exception:
-            pass
+    The scan runs on a background thread so the main UI stays responsive on
+    slow storage (sdcard, large directories). A live counter is printed while
+    the thread works — "Scanning... 3 found" — and the function blocks only
+    until the thread finishes, not while each directory is being walked.
+    """
+    import time
+    found = {}
+    lock  = threading.Lock()
+    done  = threading.Event()
+
+    def _scan():
+        for base in SCAN_PATHS:
+            if not os.path.isdir(base):
+                continue
+            try:
+                for fname in os.listdir(base):
+                    if not fname.lower().endswith(".gguf"):
+                        continue
+                    fpath = os.path.join(base, fname)
+                    with lock:
+                        if fpath in found:
+                            continue
+                    try:
+                        size  = os.path.getsize(fpath)
+                        entry = {
+                            "filename": fname,
+                            "path":     fpath,
+                            "size_gb":  round(size / 1024**3, 2),
+                            "source":   "scan",
+                        }
+                        with lock:
+                            found[fpath] = entry
+                    except Exception:
+                        pass
+            except Exception:
+                pass
+        done.set()
+
+    thread = threading.Thread(target=_scan, daemon=True)
+    thread.start()
+
+    # Live counter — print progress while background thread works.
+    # Uses \r to overwrite the same line so it doesn't flood the terminal.
+    last_count = -1
+    while not done.wait(timeout=0.2):
+        with lock:
+            count = len(found)
+        if count != last_count:
+            print(f"\r  Scanning... {count} found", end="", flush=True)
+            last_count = count
+
+    # Final count once thread is done
+    with lock:
+        total = len(found)
+    print(f"\r  Scanning... {total} found    ")  # trailing spaces clear leftover chars
 
     return list(found.values())
 
