@@ -36,7 +36,7 @@ jobs:
             Write-Error "install.ps1 looks too small ($size bytes)"
             exit 1
           }
-          Write-Host "install.ps1 found — $size bytes"
+          Write-Host "install.ps1 found - $size bytes"
         shell: powershell
 
       - name: Check install.ps1 syntax
