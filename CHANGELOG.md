@@ -1,6 +1,42 @@
 # llamdrop Changelog
 
-## v0.8.6 — Current
+## v0.8.7 — Current
+
+### Under the hood — performance and correctness cleanup
+
+No new features in this release. Everything here is an existing feature working smarter or faster.
+
+**Startup is faster**
+
+llamdrop was running its full hardware detection routine three separate times every time it launched — once to build the device profile, once for the first-run welcome screen, and once for the GPU check. Each run fired off subprocess calls to `getprop`, `lspci`, `nvidia-smi`, and friends. Now it runs exactly once and reuses the result everywhere. On slower devices this is a noticeable improvement.
+
+**Chatting with long conversations is faster**
+
+Every time you sent a message, llamdrop was rebuilding the entire conversation prompt from scratch — looping through all 20, 30, 40 turns and re-serialising kilobytes of unchanged text. Now it keeps an incremental buffer and appends only the new turn. The full rebuild only happens when context is trimmed (since turns were deleted).
+
+**Context trimming is smarter**
+
+When RAM gets low and llamdrop needs to shorten the conversation, it used to cut from the tail — keeping only the last N turns. That meant it could silently delete the opening exchange where you set up the task, the persona, or the key constraints. Now it always keeps the first exchange and the most recent turns, deleting from the middle instead. Your original intent is preserved.
+
+**Prompts no longer touch the disk on Android**
+
+On every single message, llamdrop was writing the full prompt to a temporary file on flash storage, then deleting it after inference. On Android with slow storage this was unnecessary I/O on every response. The prompt is now passed via stdin instead — no disk write, no cleanup.
+
+**Model responses can no longer be silently corrupted**
+
+llamdrop was applying a noise filter (lines starting with `llama_`, `ggml_`, etc.) to the model's stdout output. If a model produced a real response that happened to contain one of those prefixes — a code snippet, a log file, a debug output — that line was silently deleted. The noise filter now only applies to stderr, which is where the actual noise comes from. Stdout is passed through untouched.
+
+**Category switching in the model browser is now instant**
+
+Pressing C to filter models by category (chat, coding, reasoning, etc.) was re-running the full device compatibility check on every keypress — re-evaluating tier gates, RAM gates, and variant picking across all 38 models. Now the compatibility check runs once when the browser opens and the result is cached. Category switching is a simple in-memory slice with no repeated RAM reads.
+
+**RAM reads consolidated**
+
+`/proc/meminfo` was being read independently in three different places — `specs.py`, `chat.py`, and `downloader.py` — with slightly different implementations. There is now one shared `read_available_ram_gb()` function in `specs.py` that the other modules import. Inside the chat loop, RAM is read once per turn and the value is passed through to every function that needs it instead of each reading it separately.
+
+---
+
+## v0.8.6
 
 ### Cancelled downloads no longer show as valid models
 
