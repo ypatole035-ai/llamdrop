@@ -425,9 +425,9 @@ def format_profile_summary(profile):
     swap         = ram.get("swap_free_gb", 0)
     cores        = cpu.get("cores", 1)
     chip         = cpu.get("chip", "Unknown")
-    plat         = profile.get("platform", "unknown")
-    device_class = profile.get("device_class", "")
-    threads      = profile.get("optimal_threads", "?")
+    plat         = profile.get("platform", "unknown") if isinstance(profile, dict) else getattr(profile, "platform", "unknown")
+    device_class = profile.get("device_class", "") if isinstance(profile, dict) else getattr(profile, "device_class", "")
+    threads      = profile.get("optimal_threads", "?") if isinstance(profile, dict) else getattr(profile, "optimal_threads", "?")
 
     swap_str  = f" +{swap}GB swap" if swap > 0 else ""
     class_str = f" · {device_class}" if device_class else ""
