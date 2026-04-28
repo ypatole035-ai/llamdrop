@@ -332,6 +332,23 @@ def run_browser(stdscr, models, device_profile):
         "math":        "🔢 Math",
     }
 
+    # ── Category cache ────────────────────────────────────────────────────────
+    # filter_models_for_device() (tier gate + RAM gate + variant picking) runs
+    # once here — the result is `filtered_models`. Category switching inside the
+    # curses loop is then a simple list comprehension on this cached list, with
+    # no repeated RAM reads or model evaluation on each keypress.
+    filtered_models = models  # already filtered by show_browser before entering
+
+    # Pre-build per-category slices so C keypresses are O(n) list comprehensions
+    # on the cached filtered list rather than re-running the full filter pipeline.
+    def _apply_category(cat):
+        if not cat:
+            return filtered_models
+        result = [m for m in filtered_models if cat in m.get("categories", [])]
+        return result if result else filtered_models  # fallback to all if empty
+
+    display_models = filtered_models  # initial view: all compatible models
+
     while True:
         stdscr.clear()
         height, width = stdscr.getmaxyx()
@@ -351,12 +368,12 @@ def run_browser(stdscr, models, device_profile):
             if key in (ord('q'), ord('Q')):
                 return None
             if key in (ord('c'), ord('C')):
-                # Cycle through categories
                 try:
                     ci = CATEGORY_CYCLE.index(active_category)
                     active_category = CATEGORY_CYCLE[(ci + 1) % len(CATEGORY_CYCLE)]
                 except (ValueError, NameError):
                     active_category = None
+                display_models = _apply_category(active_category)
                 selected = 0
                 scroll_offset = 0
             continue
@@ -366,15 +383,6 @@ def run_browser(stdscr, models, device_profile):
             scroll_offset = selected
         elif selected >= scroll_offset + list_height:
             scroll_offset = selected - list_height + 1
-
-        # Apply category filter
-        if active_category:
-            display_models = [
-                m for m in models
-                if active_category in m.get("categories", [])
-            ] or models  # fallback to all if filter gives nothing
-        else:
-            display_models = models
 
         # Clamp selected to display_models length
         if selected >= len(display_models):
@@ -401,6 +409,16 @@ def run_browser(stdscr, models, device_profile):
             selected += 1
         elif key in (curses.KEY_ENTER, ord('\n'), ord('\r')):
             return display_models[selected] if display_models else None
+        elif key in (ord('c'), ord('C')):
+            # Cycle category filter — pure in-memory slice of cached filtered_models
+            try:
+                ci = CATEGORY_CYCLE.index(active_category)
+                active_category = CATEGORY_CYCLE[(ci + 1) % len(CATEGORY_CYCLE)]
+            except (ValueError, NameError):
+                active_category = None
+            display_models = _apply_category(active_category)
+            selected = 0
+            scroll_offset = 0
         elif key in (ord('q'), ord('Q'), 27):  # Q or Escape
             return None
 
