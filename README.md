@@ -6,7 +6,7 @@
 [![Platform](https://img.shields.io/badge/Platform-Android%20%7C%20Linux%20%7C%20RPi%20%7C%20macOS%20%7C%20Windows-green.svg)]()
 [![Status](https://img.shields.io/badge/Status-Active-brightgreen.svg)]()
 [![Free Forever](https://img.shields.io/badge/Free-Forever-brightgreen.svg)]()
-[![Version](https://img.shields.io/badge/Version-0.8.5-blue.svg)]()
+[![Version](https://img.shields.io/badge/Version-0.9.0-blue.svg)]()
 
 ---
 
@@ -65,9 +65,7 @@ That's it. Two commands. No compilation. No configuration. No account needed.
 
 ---
 
-
 ## Features
-
 
 ### Device Intelligence
 - 🔍 **Full device profiling** — reads RAM, CPU model, core layout (big.LITTLE aware), CPU flags (AVX2/AVX512/NEON), GPU vendor, storage, Android SoC/API level
@@ -79,32 +77,35 @@ That's it. Two commands. No compilation. No configuration. No account needed.
 
 ### Model Browser & Download
 - 📋 **Smart model browser** — two modes:
-  - ✅ **Verified catalog** — curated models confirmed working on low-end devices (25 models, 3 tiers)
+  - ✅ **Verified catalog** — 41 curated models confirmed working across all device tiers, filtered automatically to show only what fits your hardware
   - 🔎 **Live HuggingFace search** — search any GGUF model with live RAM estimates
 - ⬇️ **Resilient downloader** — auto-resumes on connection drops, retries automatically, verifies via SHA-256 checksum
 - 🎯 **Smart quantization** — picks the best Q4/Q2/Q5/IQ variant based on your *live* RAM at download time
 - 🧩 **IQ quant support** — IQ3_M and IQ2_M variants for more models — better quality than Q2_K at same RAM. Vulkan auto-disabled for IQ quants (incompatible).
 - 📊 **Benchmark scores** — tokens/second recorded per model (rolling average, last 5 runs), shown in browser as ⚡ X t/s
+- 🗂️ **Cancelled download cleanup** — partial files deleted immediately on cancel, never show as valid models
 
 ### Chat & Inference
 - 🤖 **Ollama backend** — auto-detected on Linux/desktop and macOS. Routes inference through Ollama HTTP API when running.
-- 💬 **Stable chat** — automatic context trimming prevents out-of-memory crashes
+- 💬 **Stable chat** — automatic context trimming prevents out-of-memory crashes. Always preserves your first exchange — only the middle gets trimmed.
 - 🦙 **Live thinking indicator** — animated spinner with non-blocking stdout while the model generates
 - 🎯 **Prompt format auto-detect** — correct template per model family (ChatML, Llama3, Gemma, Phi3)
 - 📂 **File context** — attach a file to your conversation before chatting
-- 💾 **Session save/load/delete** — resume conversations where you left off, with auto-save every 10 messages
+- 💾 **Session save/load/delete** — resume conversations where you left off, with auto-save every 5 exchanges (10 messages)
 - 📤 **Chat export** — `/export` saves conversation to Downloads as markdown
 - 🗂️ **Conditional mmap** — 15–30% lower peak RAM on internal storage models; external/sdcard keeps `--no-mmap`
+- 🧹 **Clean output pipeline** — llama.cpp banner, duplicate responses, timing stats, and format tags (ChatML boundaries) are all stripped. What you see is only the model's response.
 
 ### System & UX
 - ⚠️ **Live RAM monitor** — colour-coded bar in UI (green/yellow/red), warns if memory gets critical during chat
 - 🔋 **Battery monitoring** — shows charge %, per-inference battery drop, warns at configurable low threshold. Distinct icons per charge range.
-- 📂 **Phone-wide GGUF scanner** — finds models you already have in Downloads, Documents, etc.
+- 📂 **Phone-wide GGUF scanner** — finds models you already have in Downloads, Documents, etc. Runs in background — UI stays responsive with a live counter.
 - 🆙 **Self-update** — `llamdrop update` pulls latest version from GitHub (resolves correct install root)
 - 🩺 **Doctor** — `llamdrop doctor` checks binary, libraries, RAM, storage, network, Python version, Termux permissions, and Ollama status
 - ⚙️ **Config file** — override threads, context, temperature, system prompt, auto-save, battery warning threshold at `~/.llamdrop/config.json`. Hot-reloads on external edits.
 - 🌐 **Multi-language UI** — English, Hindi, Spanish, Portuguese, Arabic
 - 🖥️ **Curses TUI** — keyboard-navigable menu with live RAM bar, battery line, llama.cpp + GPU status, and update notices
+- ⚡ **Fast startup** — hardware detection runs exactly once at launch. Startup is noticeably faster on low-end devices.
 
 ---
 
@@ -122,15 +123,19 @@ Search any model on HuggingFace directly from llamdrop.
 The tool estimates RAM requirements from file size and quantization type.
 Clearly marked as **unverified** — for experienced users who want to explore beyond the catalog.
 
-**Current verified model tiers (25 models):**
+**Current verified catalog (41 models across 6 tiers):**
 
 | Tier | Available RAM | Example Models |
 |---|---|---|
-| 1 — Ultra low | < 2 GB | SmolLM2 135M/360M/1.7B, Qwen2.5 0.5B, TinyLlama, Gemma 3 1B |
-| 2 — Standard | 2 – 4 GB | Qwen2.5 3B, Llama 3.2 3B, Phi-4 Mini, Gemma 3 4B, Qwen3 4B |
-| 3 — Better hardware | 4 GB+ | Mistral 7B, DeepSeek R1 7B, Aya Expanse 8B, Phi-3.5 Mini |
+| Micro | < 1 GB | SmolLM2 135M / 360M / 1.7B, Qwen2.5 0.5B, TinyLlama, Gemma 3 1B, Qwen3 1.7B |
+| Low | 1 – 3 GB | Qwen2.5 1.5B, Llama 3.2 1B, DeepSeek R1 1.5B, Gemma 2 2B, Phi-4 Mini, Qwen3 4B, SmolLM3 3B |
+| Low-Mid | 3 – 6 GB | Mistral 7B, Llama 3.1 8B, DeepSeek R1 7B, Qwen2.5 7B, Phi-3.5 Mini, Llama 3.2 3B |
+| Mid | 6 – 12 GB | Gemma 3 12B, Qwen3 8B, Phi-4 14B, DeepSeek R1 14B, Mistral NeMo 12B |
+| High | 12 – 24 GB | Gemma 3 27B, Qwen3 32B, DeepSeek R1 32B, Qwen2.5 Coder 32B |
+| Desktop | 24 GB+ | Llama 3.3 70B, Qwen2.5 72B, DeepSeek R1 70B |
 
 All verified models are free, open-source, and downloadable without login or account.
+The browser automatically hides models outside your device's tier — you only see what can actually run.
 
 ---
 
@@ -178,8 +183,8 @@ llamdrop/
 ├── llamdrop.py          # Main entry point + CLI (update, doctor, version)
 ├── install.sh           # One-line installer (Linux/Android/macOS/WSL)
 ├── install.ps1          # Native Windows PowerShell installer
-├── models.json          # Verified model catalog
-├── CHANGELOG.md         # Version history
+├── models.json          # Verified model catalog (41 models, 6 tiers)
+├── CHANGELOG.md         # Full version history
 ├── modules/
 │   ├── specs.py         # Full device profiling — DeviceProfile dataclass, tier, backend, flags
 │   ├── device.py        # Hardware detection bridge + legacy compat
@@ -219,7 +224,7 @@ llamdrop/
 - [x] Clean inference extraction — `_run_inference()` / `_dispatch_inference()`
 - [x] 25 models in catalog
 
-### v0.8 — Done
+### v0.8.5 — Done
 - [x] Full `DeviceProfile` dataclass — single source of truth for all device decisions
 - [x] 7-tier classification (Micro / Low / Low-Mid / Mid / High / Desktop / Workstation)
 - [x] 80+ SoC chip translation table
@@ -233,11 +238,22 @@ llamdrop/
 - [x] Arabic language added
 - [x] Icon-based menu index — adding/removing items no longer shifts handlers
 - [x] RAM estimate overhead raised to 1.4× for KV cache accuracy
-- [x] Multiple critical bug fixes (browser.py content swap, blocking stdout, config cache, auto-save counter, menu index offsets, Vulkan false positives)
+- [x] Multiple critical bug fixes (browser content swap, blocking stdout, config cache, auto-save counter, menu index offsets, Vulkan false positives)
 
-     FOR CURRENT VERSION UPDATES BETWEEN v0.8 and v0.9 check [CHANGELOG](CHANGELOG.md)
+### v0.9.0 — Current
+- [x] Device-aware model browser — shows only models that fit your hardware tier and RAM
+- [x] Catalog expanded from 25 to 41 models across 6 tiers (micro through desktop/workstation)
+- [x] Chat output pipeline fully cleaned — no llama.cpp banner bleed, no duplicate responses, no leaked timing stats or format tags
+- [x] Cancelled downloads cleaned up immediately — partial files never appear as valid models
+- [x] Background GGUF scanner — My Models screen no longer freezes, live counter while scanning
+- [x] Smarter context trimming — first exchange always preserved, middle trimmed instead of tail
+- [x] RAM reads consolidated to one shared source across all modules
+- [x] Hardware detection runs once at startup instead of three separate times
+- [x] Incremental prompt buffer — full prompt no longer rebuilt from scratch every turn
+- [x] Noise filter moved to stderr only — model stdout no longer silently corrupted
+- [x] Auto-save constant named and documented (`_AUTOSAVE_EVERY_TURNS = 10`)
 
-### v0.9 — Next
+### v1.0 — Planned
 - [ ] Web-based model catalog (GitHub Pages)
 - [ ] Community device profile submissions
 - [ ] `/doc` command — document chat with chunking (no vector DB needed)
