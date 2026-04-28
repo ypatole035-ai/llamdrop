@@ -2,6 +2,12 @@
 
 ## v0.9.1 — current
 
+### Bugfix — app crashed on launch after update
+
+- llamdrop was crashing immediately after the v0.9.1 update with a `TypeError` on startup
+- The device info reader was expecting data in one format but was receiving it in another
+- Fixed so llamdrop now opens normally without any crash
+
 ### Windows CI — automated installer validation
 
 - Windows GitHub Actions workflow now runs on every push to main
