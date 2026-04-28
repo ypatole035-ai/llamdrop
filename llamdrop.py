@@ -101,8 +101,15 @@ def get_menu_items(device_profile=None):
         ("💾", t("menu_resume"),   t("desc_resume")),
     ]
     # Show Ollama option only when the server is detected as running
-    ollama_info = (device_profile or {}).get("ollama", {})
-    if ollama_info.get("running"):
+    # DeviceProfile is a dataclass — check backend field directly
+    _ollama_running = False
+    if device_profile is not None:
+        try:
+            from backends.ollama import is_ollama_running
+            _ollama_running = (getattr(device_profile, "backend", "") == "ollama") or is_ollama_running()
+        except Exception:
+            pass
+    if _ollama_running:
         items.append(("🤖", "Ollama Chat", "Chat using a locally-running Ollama model"))
     items += [
         ("🔧", t("menu_device"),   t("desc_device")),
