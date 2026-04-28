@@ -299,15 +299,15 @@ def show_device_info(device_profile, vulkan_info=None):
     if _SPECS_OK:
         # ── Rich specs.py Device Profile card ────────────────────────────────
         try:
-            rich_profile = build_device_profile()
-            # Print the full Device Profile card
-            card = format_device_profile(rich_profile)
+            # device_profile is already the rich DeviceProfile built at startup
+            # — no need to re-run detection here
+            card = format_device_profile(device_profile)
             for line in card.splitlines():
                 print("  " + line if not line.startswith("  ") else line)
 
             # Model recommendations
             print(c(BOLD, "\n  MODEL RECOMMENDATIONS"))
-            recs_text = format_model_recommendations(rich_profile)
+            recs_text = format_model_recommendations(device_profile)
             for line in recs_text.splitlines():
                 if line.strip().startswith("★"):
                     print(c(GREEN, line))
@@ -719,10 +719,11 @@ def main():
     print(f"  {t('loading')}")
     device_profile = get_device_profile()  # legacy dict — always works
 
-    # Bug #8 fix: when specs.py is available, build the rich DeviceProfile and
-    # use it as the working profile for ALL runtime paths (launch, chat, config).
-    # Previously the dataclass was only used for display while the legacy dict
-    # was passed to every functional module, losing all the new flag computation.
+    # Build the rich DeviceProfile once and reuse it everywhere.
+    # Previously build_device_profile() was called 3 separate times during
+    # startup (here, welcome screen, GPU check) — each call re-ran all
+    # subprocess detection (sysctl, getprop, lspci, nvidia-smi etc.) for zero
+    # benefit. Now it runs exactly once and the result is passed through.
     if _SPECS_OK:
         try:
             device_profile = build_device_profile()
@@ -758,12 +759,12 @@ def main():
 
         if _SPECS_OK:
             try:
-                _fp = build_device_profile()
+                # Reuse the already-built device_profile — no re-detection needed
                 print(c(CYAN, "  Analysing your hardware...\n"))
-                card = format_device_profile(_fp)
+                card = format_device_profile(device_profile)
                 for line in card.splitlines():
                     print("  " + line if not line.startswith("  ") else line)
-                recs_text = format_model_recommendations(_fp)
+                recs_text = format_model_recommendations(device_profile)
                 for line in recs_text.splitlines():
                     if line.strip().startswith("★"):
                         print(c(GREEN, line))
@@ -809,24 +810,24 @@ def main():
     # Detect GPU acceleration at startup using specs.py when available.
     # specs.py correctly marks Mali/Adreno as gpu_usable=False even when Vulkan
     # hardware is present — because Mali Vulkan is slower than CPU for LLM.
+    # Reads from the already-built device_profile — no re-detection needed.
     print("  Checking GPU acceleration...", end="", flush=True)
     vulkan_info = None
     if _SPECS_OK:
         try:
-            _startup_profile = build_device_profile()
-            if _startup_profile.gpu_usable:
-                print(c(GREEN, f" ✓ {_startup_profile.gpu_model}"))
+            if device_profile.gpu_usable:
+                print(c(GREEN, f" ✓ {device_profile.gpu_model}"))
                 vulkan_info = {"available": True,
-                               "gpu_type": _startup_profile.gpu_model,
-                               "note": _startup_profile.gpu_note}
+                               "gpu_type": device_profile.gpu_model,
+                               "note": device_profile.gpu_note}
             else:
-                gpu_note = _startup_profile.gpu_note or "CPU only"
+                gpu_note = device_profile.gpu_note or "CPU only"
                 print(f" CPU only")
-                if _startup_profile.gpu_vendor not in ("none",):
+                if device_profile.gpu_vendor not in ("none",):
                     # GPU exists but disabled — tell the user why
                     print(c(YELLOW, f"  Note: {gpu_note}"))
                 vulkan_info = {"available": False,
-                               "gpu_type": _startup_profile.gpu_model,
+                               "gpu_type": device_profile.gpu_model,
                                "note": gpu_note}
         except Exception:
             vulkan_info = detect_vulkan()
