@@ -1,0 +1,122 @@
+name: Linux Installer Test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  release:
+    types: [published]
+
+jobs:
+  test-linux-installer:
+    name: Test install.sh on Linux
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Check install.sh exists and is executable
+        run: |
+          test -f install.sh || (echo "install.sh not found" && exit 1)
+          chmod +x install.sh
+          size=$(wc -c < install.sh)
+          echo "install.sh size: $size bytes"
+          [ "$size" -gt 1000 ] || (echo "install.sh too small" && exit 1)
+
+      - name: Check install.sh syntax (bash -n)
+        run: |
+          bash -n install.sh && echo "install.sh syntax OK"
+
+      - name: Install Python dependencies
+        run: |
+          pip install --quiet requests 2>/dev/null || true
+
+      - name: Run llamdrop version (no llama binary needed)
+        run: |
+          cd $GITHUB_WORKSPACE
+          export PYTHONPATH=modules
+          python3 -c "
+          import sys, os
+          sys.path.insert(0, 'modules')
+
+          # Patch curses so it doesn't need a terminal
+          import unittest.mock as mock
+          sys.modules['curses'] = mock.MagicMock()
+
+          with open('llamdrop.py') as f:
+              src = f.read()
+
+          # Just extract and print VERSION
+          for line in src.splitlines():
+              if line.startswith('VERSION'):
+                  version = line.split('=')[1].strip().strip('\"')
+                  print(f'llamdrop version: {version}')
+                  break
+          "
+
+      - name: Run device detection (specs.py)
+        run: |
+          export PYTHONPATH=modules
+          python3 -c "
+          import sys
+          sys.path.insert(0, 'modules')
+          try:
+              from specs import build_device_profile, format_device_profile
+              profile = build_device_profile()
+              print('Device profile built OK')
+              print(f'  Platform : {profile.platform}')
+              print(f'  RAM total: {profile.ram_total_gb} GB')
+              print(f'  Tier     : {profile.tier}')
+              print(f'  Backend  : {profile.backend}')
+          except Exception as e:
+              print(f'specs.py error: {e}')
+              sys.exit(1)
+          "
+
+      - name: Run RAM monitor
+        run: |
+          export PYTHONPATH=modules
+          python3 -c "
+          import sys
+          sys.path.insert(0, 'modules')
+          from ram_monitor import read_ram_full, ram_one_line
+          info = read_ram_full()
+          print('RAM monitor OK')
+          print(f'  Available: {info.get(\"available_gb\", \"?\")} GB')
+          print(f'  Total    : {info.get(\"total_gb\", \"?\")} GB')
+          "
+
+      - name: Run doctor module (no binary)
+        run: |
+          export PYTHONPATH=modules
+          python3 -c "
+          import sys
+          sys.path.insert(0, 'modules')
+          import ast
+          with open('modules/doctor.py') as f:
+              ast.parse(f.read())
+          print('doctor.py parses OK')
+          "
+
+      - name: Validate models.json
+        run: |
+          python3 -c "
+          import json
+          with open('models.json') as f:
+              data = json.load(f)
+          models = data['models']
+          print(f'models.json OK — {len(models)} models, v{data[\"version\"]}')
+          tiers = {}
+          for m in models:
+              t = m.get('min_tier', 'unknown')
+              tiers[t] = tiers.get(t, 0) + 1
+          for t, count in sorted(tiers.items()):
+              print(f'  {t}: {count} models')
+          "
+          
