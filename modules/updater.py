@@ -46,6 +46,7 @@ UPDATE_FILES = {
     "modules/backends/__init__.py": "modules/backends/__init__.py",
     "modules/backends/ollama.py":   "modules/backends/ollama.py",
     "modules/filecontext.py":        "modules/filecontext.py",
+    "modules/specs.py":              "modules/specs.py",
 }
 
 # Files that should NEVER be touched by update
@@ -402,4 +403,4 @@ def _refresh_catalog_silent():
                 f.write(text)
     except Exception:
         pass
-        
+
