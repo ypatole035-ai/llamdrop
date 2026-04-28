@@ -418,8 +418,8 @@ def get_device_profile():
 
 def format_profile_summary(profile):
     """Returns a human-readable one-line summary of device specs."""
-    ram          = profile["ram"]
-    cpu          = profile["cpu"]
+    ram          = profile["ram"] if isinstance(profile, dict) else vars(profile).get("ram", {})
+    cpu          = profile["cpu"] if isinstance(profile, dict) else vars(profile).get("cpu", {})
     avail        = ram.get("available_gb", 0)
     total        = ram.get("total_gb", 0)
     swap         = ram.get("swap_free_gb", 0)
