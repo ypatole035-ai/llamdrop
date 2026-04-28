@@ -1,6 +1,26 @@
 # llamdrop Changelog
 
-## v0.8.8 — Current
+## v0.8.9 — Current
+
+### Chat output fixes — banner, duplicate responses, and leaked meta lines
+
+No new features. All fixes are in the chat response pipeline.
+
+**The llama.cpp banner no longer appears in chat**
+
+On certain llama.cpp builds, the startup banner — build hash, model name, and the available commands list (`/exit`, `/regen`, `/clear`, etc.) — was printing directly into the chat window as if it were part of the model's response. This happened because the prompt was being passed via stdin, and some builds on Android ignore stdin in single-turn mode and fall into interactive mode instead. The prompt is now passed via the `-p` flag, which is the canonical non-interactive method and works on all builds. The banner is gone.
+
+**Responses no longer print twice**
+
+With the `-p` flag, llama.cpp appends a timing stats line and then repeats the response at the end of its output — `[ Prompt: 125.5 t/s | Generation: 29.3 t/s ]` followed by the response text again. llamdrop was collecting everything including the duplicate. Now it stops collecting as soon as it hits the stats line. Only the first, clean response is shown.
+
+**Timing stats, "Exiting...", and format tags no longer leak into responses**
+
+Three types of llama.cpp output were showing up in chat: the `[ Prompt: X t/s | Generation: Y t/s ]` timing line, the `Exiting...` exit message, and leftover `<|im_start|>` / `<|im_end|>` chatml boundary tags. These are now recognised as llama.cpp meta output and stripped cleanly. They never appear as response content regardless of where they fall in the raw output.
+
+---
+
+## v0.8.8
 
 ### Under the hood — downloader and startup cleanup
 
