@@ -225,6 +225,40 @@ def _detect_ram() -> dict:
                 "swap_free_gb": 0.0, "error": str(e)}
 
 
+# ── Shared RAM utility ───────────────────────────────────────────────────────
+#
+# Single source of truth for live available RAM.
+# chat.py and downloader.py both import this instead of reimplementing it.
+
+def read_available_ram_gb() -> float:
+    """
+    Return current available RAM in GB.
+    Reads /proc/meminfo on Linux/Termux, falls back to 0.0 on error.
+    This is the shared utility — chat.py and downloader.py import this
+    instead of maintaining their own copies.
+    """
+    try:
+        if platform.system() == "Darwin":
+            vm = subprocess.run(["vm_stat"], capture_output=True, text=True, timeout=5)
+            free_pages = 0
+            page_size  = 4096
+            for line in vm.stdout.splitlines():
+                if "Pages free" in line or "Pages speculative" in line:
+                    try:
+                        free_pages += int(line.split(":")[1].strip().rstrip("."))
+                    except Exception:
+                        pass
+            return round(free_pages * page_size / 1024 / 1024 / 1024, 2)
+        with open("/proc/meminfo") as f:
+            for line in f:
+                if line.startswith("MemAvailable"):
+                    kb = int(line.split()[1])
+                    return round(kb / 1024 / 1024, 2)
+    except Exception:
+        pass
+    return 0.0
+
+
 # ── CPU detection ─────────────────────────────────────────────────────────────
 
 # Chip code → friendly name
