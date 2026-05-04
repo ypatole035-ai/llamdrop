@@ -46,13 +46,13 @@ llamdrop is for **anyone on low-end or budget hardware** who keeps getting left 
 **Android (Termux) / Linux / Raspberry Pi / macOS:**
 
 ```bash
-curl -sL https://raw.githubusercontent.com/ypatole035-ai/llamdrop/main/install.sh | bash
+curl -sL https://raw.githubusercontent.com/DeVenLucaz/llamdrop/main/install.sh | bash
 ```
 
 **Windows (PowerShell, run as Administrator):**
 
 ```powershell
-irm https://raw.githubusercontent.com/ypatole035-ai/llamdrop/main/install.ps1 | iex
+irm https://raw.githubusercontent.com/DeVenLucaz/llamdrop/main/install.ps1 | iex
 ```
 
 Then run:
@@ -297,5 +297,5 @@ In plain language:
 >
 > llamdrop is the tool that should have existed already.
 
-Built by [@ypatole035-ai](https://github.com/ypatole035-ai) and contributors.
+Built by [@DeVenLucaz](https://github.com/DeVenLucaz) and contributors.
 If llamdrop helped you, star the repo and share it with someone who needs it.
